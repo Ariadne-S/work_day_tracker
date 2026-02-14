@@ -8,7 +8,7 @@ pub fn run_seed(path: &std::path::Path, force: bool) -> Result<u32, String> {
     db::seed_sample_data_impl(force)
 }
 
-use commands::{delete_session, get_export_csv_by_fy, get_export_csv_for_fy, get_financial_years_with_data, get_sessions, get_settings, get_timer_state, get_weekly_summary, log_full_day, pause_session, ping, resume_session, save_setting, seed_sample_data, start_session, stop_session, update_session_duration};
+use commands::{delete_session, get_export_csv_by_fy, get_export_csv_for_fy, get_financial_years_with_data, get_leave_early_target, get_overtime_status, get_sessions, get_settings, get_timer_state, get_weekly_summary, log_full_day, pause_session, ping, quick_log_with_defaults, resume_session, save_setting, seed_sample_data, set_leave_early_target, start_session, stop_session, update_session_duration};
 use tauri::{Emitter, Manager};
 
 #[cfg(test)]
@@ -216,6 +216,17 @@ mod tests {
 
     #[test]
     #[serial]
+    fn test_get_overtime_status() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let db_path = dir.path().join("test.db");
+        db::init_at(&db_path).expect("db init failed");
+        let status = db::get_overtime_status_impl().expect("get_overtime_status failed");
+        // Day of week varies; we mainly check it doesn't panic and returns valid struct
+        assert!(status.surplus_minutes <= 24 * 60 * 7);
+    }
+
+    #[test]
+    #[serial]
     fn test_delete_session() {
         let dir = tempfile::tempdir().expect("temp dir");
         let db_path = dir.path().join("test.db");
@@ -291,11 +302,14 @@ pub fn run() {
                 .text("start_home", "Start (Home)")
                 .text("start_office", "Start (Office)")
                 .separator()
+                .text("quick_log", "Quick log (defaults)")
+                .separator()
                 .text("pause", "Pause")
                 .text("resume", "Resume")
                 .text("stop", "Stop")
                 .separator()
                 .text("show", "Show")
+                .text("settings", "Settings")
                 .text("quit", "Quit")
                 .build()
                 .expect("failed to create tray menu");
@@ -322,6 +336,18 @@ pub fn run() {
                                 let _ = w.show();
                                 let _ = w.set_focus();
                             }
+                        }
+                        "settings" => {
+                            if let Some(w) = app.get_webview_window("main") {
+                                let _ = w.show();
+                                let _ = w.set_focus();
+                                let _ = app.emit("navigate-to", "settings");
+                            }
+                        }
+                        "quick_log" => {
+                            let _ = db::quick_log_with_defaults_impl();
+                            let _ = app.emit("timer-state-changed", ());
+                            update_tray_tooltip(app);
                         }
                         "quit" => app.exit(0),
                         "start_home" => {
@@ -366,7 +392,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![ping, get_timer_state, start_session, stop_session, pause_session, resume_session, get_sessions, get_settings, save_setting, get_weekly_summary, get_export_csv_by_fy, get_export_csv_for_fy, get_financial_years_with_data, seed_sample_data, log_full_day, update_session_duration, delete_session])
+        .invoke_handler(tauri::generate_handler![ping, get_timer_state, start_session, stop_session, pause_session, resume_session, get_sessions, get_settings, save_setting, get_weekly_summary, get_overtime_status, set_leave_early_target, get_leave_early_target, get_export_csv_by_fy, get_export_csv_for_fy, get_financial_years_with_data, seed_sample_data, log_full_day, quick_log_with_defaults, update_session_duration, delete_session])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 window.hide().unwrap();

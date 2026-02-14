@@ -53,6 +53,12 @@ pub fn log_full_day(date: String, location: String, duration_minutes: i32) -> Re
     db::log_full_day_impl(&date, &location, duration_minutes)
 }
 
+/// Quick log using defaults (today, default location, expected_hours/5).
+#[tauri::command]
+pub fn quick_log_with_defaults() -> Result<i64, String> {
+    db::quick_log_with_defaults_impl()
+}
+
 /// Update duration of a completed session.
 #[tauri::command]
 pub fn update_session_duration(session_id: i64, new_duration_minutes: i32) -> Result<(), String> {
@@ -78,6 +84,24 @@ pub fn save_setting(key: String, value: String) -> Result<(), String> {
 #[tauri::command]
 pub fn get_weekly_summary() -> Result<db::WeeklySummary, String> {
     db::get_weekly_summary_impl()
+}
+
+/// Overtime status for Friday: whether to show "leave early" modal before starting.
+#[tauri::command]
+pub fn get_overtime_status() -> Result<db::OvertimeStatus, String> {
+    db::get_overtime_status_impl()
+}
+
+/// Set how many minutes to work today before "work week accomplished" alert. Cleared on stop.
+#[tauri::command]
+pub fn set_leave_early_target(minutes: u32) -> Result<(), String> {
+    db::set_leave_early_target_impl(minutes)
+}
+
+/// Get leave-early target minutes, if set.
+#[tauri::command]
+pub fn get_leave_early_target() -> Result<Option<u32>, String> {
+    db::get_leave_early_target_impl()
 }
 
 /// Returns one CSV per Australian financial year: Vec of (fy, csv_content). One file per year.

@@ -42,6 +42,8 @@ pub fn init_at(path: &Path) -> Result<()> {
         INSERT OR IGNORE INTO settings (key, value) VALUES ('active_session_paused', '0');
         INSERT OR IGNORE INTO settings (key, value) VALUES ('expected_hours_per_week', '40');
         INSERT OR IGNORE INTO settings (key, value) VALUES ('default_location', 'home');
+        INSERT OR IGNORE INTO settings (key, value) VALUES ('enable_overtime_alerts', '1');
+        INSERT OR IGNORE INTO settings (key, value) VALUES ('leave_early_target_minutes', '');
         ",
     )?;
     let mut guard = DB_PATH.lock().unwrap();
@@ -164,6 +166,21 @@ pub fn update_session_duration_impl(session_id: i64, new_duration_minutes: i32) 
     Ok(())
 }
 
+/// Quick log using defaults: today's date, default location, expected_hours/5 as duration.
+pub fn quick_log_with_defaults_impl() -> Result<i64, String> {
+    let date = Utc::now().format("%Y-%m-%d").to_string();
+    let location = get_setting("default_location").unwrap_or_else(|_| "home".to_string());
+    let location = if location == "office" { "office" } else { "home" };
+    let expected_hours: u32 = get_setting("expected_hours_per_week")
+        .unwrap_or_else(|_| "40".to_string())
+        .parse()
+        .unwrap_or(40);
+    let default_day_hours = expected_hours as f64 / 5.0;
+    let duration_minutes = (default_day_hours * 60.0).round() as i32;
+    let duration_minutes = duration_minutes.max(60).min(24 * 60);
+    log_full_day_impl(&date, &location, duration_minutes)
+}
+
 /// Log a full work day without using the timer. Inserts a completed session.
 pub fn log_full_day_impl(date: &str, location: &str, duration_minutes: i32) -> Result<i64, String> {
     if duration_minutes <= 0 || duration_minutes > 24 * 60 {
@@ -196,11 +213,12 @@ pub fn stop_session_impl(elapsed_seconds: u64) -> Result<(), String> {
     get_connection()
         .map_err(|e| e.to_string())?
         .execute(
-        "UPDATE sessions SET end_time = ?1, duration_minutes = ?2 WHERE id = ?3",
-        params![now, duration_minutes, session_id],
+            "UPDATE sessions SET end_time = ?1, duration_minutes = ?2 WHERE id = ?3",
+            params![now, duration_minutes, session_id],
         )
         .map_err(|e| e.to_string())?;
     set_setting("active_session_id", "").map_err(|e| e.to_string())?;
+    let _ = set_setting("leave_early_target_minutes", "");
     set_setting("active_session_elapsed", "0").map_err(|e| e.to_string())?;
     set_setting("active_session_paused", "0").map_err(|e| e.to_string())?;
     Ok(())
@@ -274,12 +292,13 @@ pub fn get_sessions_impl() -> Result<Vec<SessionRow>, String> {
     sessions.map_err(|e| e.to_string())
 }
 
-const USER_SETTING_KEYS: &[&str] = &["expected_hours_per_week", "default_location"];
+const USER_SETTING_KEYS: &[&str] = &["expected_hours_per_week", "default_location", "enable_overtime_alerts"];
 
 #[derive(serde::Serialize)]
 pub struct Settings {
     pub expected_hours_per_week: u32,
     pub default_location: String,
+    pub enable_overtime_alerts: bool,
 }
 
 /// Get user-facing settings (excludes internal keys like active_session_*).
@@ -294,9 +313,15 @@ pub fn get_settings_impl() -> Result<Settings, String> {
     } else {
         "home".to_string()
     };
+    let enable_overtime_alerts = get_setting("enable_overtime_alerts")
+        .unwrap_or_else(|_| "1".to_string())
+        .parse::<u32>()
+        .unwrap_or(1)
+        != 0;
     Ok(Settings {
         expected_hours_per_week: expected,
         default_location,
+        enable_overtime_alerts,
     })
 }
 
@@ -307,6 +332,9 @@ pub fn save_setting_impl(key: &str, value: &str) -> Result<(), String> {
     }
     if key == "default_location" && value != "home" && value != "office" {
         return Err("default_location must be 'home' or 'office'".to_string());
+    }
+    if key == "enable_overtime_alerts" && value != "0" && value != "1" {
+        return Err("enable_overtime_alerts must be '0' or '1'".to_string());
     }
     set_setting(key, value).map_err(|e| e.to_string())
 }
@@ -352,6 +380,48 @@ pub fn get_weekly_summary_impl() -> Result<WeeklySummary, String> {
         expected_minutes,
         difference_minutes,
     })
+}
+
+/// Overtime status for Friday: surplus minutes when actual >= expected. Used for "leave early" modal.
+#[derive(serde::Serialize)]
+pub struct OvertimeStatus {
+    pub show_modal: bool,
+    pub surplus_minutes: u32,
+}
+
+pub fn get_overtime_status_impl() -> Result<OvertimeStatus, String> {
+    let now = Utc::now().date_naive();
+    let is_friday = now.weekday() == chrono::Weekday::Fri;
+    let enable = get_setting("enable_overtime_alerts")
+        .unwrap_or_else(|_| "1".to_string())
+        .parse::<u32>()
+        .unwrap_or(1)
+        != 0;
+    let summary = get_weekly_summary_impl()?;
+    let surplus = if summary.difference_minutes > 0 {
+        summary.difference_minutes as u32
+    } else {
+        0
+    };
+    Ok(OvertimeStatus {
+        show_modal: is_friday && enable && surplus > 0,
+        surplus_minutes: surplus,
+    })
+}
+
+pub fn set_leave_early_target_impl(minutes: u32) -> Result<(), String> {
+    set_setting("leave_early_target_minutes", &minutes.to_string()).map_err(|e| e.to_string())
+}
+
+pub fn get_leave_early_target_impl() -> Result<Option<u32>, String> {
+    let v = get_setting("leave_early_target_minutes").unwrap_or_default();
+    if v.is_empty() {
+        return Ok(None);
+    }
+    match v.parse::<u32>() {
+        Ok(n) => Ok(Some(n)),
+        Err(_) => Ok(None),
+    }
 }
 
 /// Daily totals for export: (date, location) -> total minutes.

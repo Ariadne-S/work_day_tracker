@@ -81,7 +81,7 @@ function App() {
   const [timerState, setTimerState] = useState({ status: "", elapsed_seconds: 0 });
   const [location, setLocation] = useState("home");
   const [sessions, setSessions] = useState([]);
-  const [settings, setSettings] = useState({ expected_hours_per_week: 40, default_location: "home" });
+  const [settings, setSettings] = useState({ expected_hours_per_week: 40, default_location: "home", enable_overtime_alerts: true });
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [weeklySummary, setWeeklySummary] = useState(null);
   const [exportStatus, setExportStatus] = useState("");
@@ -96,6 +96,9 @@ function App() {
   const [logDayHours, setLogDayHours] = useState(8);
   const [logDayStatus, setLogDayStatus] = useState("");
   const [editingSession, setEditingSession] = useState(null);
+  const [overtimeModal, setOvertimeModal] = useState(null);
+  const [leaveEarlyTarget, setLeaveEarlyTarget] = useState(null);
+  const [hasShownOvertimeAlert, setHasShownOvertimeAlert] = useState(false);
 
   useEffect(() => {
     refreshState(setTimerState);
@@ -113,12 +116,18 @@ function App() {
       .then((fys) => setFinancialYears(fys))
       .catch(() => setFinancialYears([]));
 
-    const unlisten = listen("timer-state-changed", () => {
+    const unlistenTimer = listen("timer-state-changed", () => {
       refreshState(setTimerState);
       refreshAppData(setSessions, setWeeklySummary, setFinancialYears);
     });
+    const unlistenNav = listen("navigate-to", (e) => {
+      if (e.payload && ["tracker", "export", "settings"].includes(e.payload)) {
+        setView(e.payload);
+      }
+    });
     return () => {
-      unlisten.then((fn) => fn());
+      unlistenTimer.then((fn) => fn());
+      unlistenNav.then((fn) => fn());
     };
   }, []);
 
@@ -128,8 +137,51 @@ function App() {
     return () => clearInterval(id);
   }, [timerState.status]);
 
+  useEffect(() => {
+    if (timerState.status !== "running") {
+      setLeaveEarlyTarget(null);
+      setHasShownOvertimeAlert(false);
+      return;
+    }
+    invoke("get_leave_early_target")
+      .then((t) => setLeaveEarlyTarget(t ?? null))
+      .catch(() => setLeaveEarlyTarget(null));
+  }, [timerState.status]);
+
+  useEffect(() => {
+    if (
+      timerState.status === "running" &&
+      leaveEarlyTarget != null &&
+      !hasShownOvertimeAlert &&
+      Math.floor(timerState.elapsed_seconds / 60) >= leaveEarlyTarget
+    ) {
+      setHasShownOvertimeAlert(true);
+      alert("Your work week is accomplished!");
+    }
+  }, [timerState.status, timerState.elapsed_seconds, leaveEarlyTarget, hasShownOvertimeAlert]);
+
   async function handleStart() {
     try {
+      if (settings.enable_overtime_alerts) {
+        const overtime = await invoke("get_overtime_status");
+        if (overtime.show_modal) {
+          setOvertimeModal({ surplus_minutes: overtime.surplus_minutes });
+          return;
+        }
+      }
+      await doStartSession();
+    } catch (e) {
+      setTimerState({ status: `Error: ${e}`, elapsed_seconds: 0 });
+    }
+  }
+
+  async function doStartSession(withLeaveEarly = false) {
+    try {
+      if (withLeaveEarly && overtimeModal) {
+        await invoke("set_leave_early_target", { minutes: overtimeModal.surplus_minutes });
+        setLeaveEarlyTarget(overtimeModal.surplus_minutes);
+      }
+      setOvertimeModal(null);
       await invoke("start_session", { location });
       refreshState(setTimerState);
     } catch (e) {
@@ -295,6 +347,10 @@ function App() {
       await invoke("save_setting", {
         key: "default_location",
         value: settings.default_location,
+      });
+      await invoke("save_setting", {
+        key: "enable_overtime_alerts",
+        value: settings.enable_overtime_alerts ? "1" : "0",
       });
       setLocation(settings.default_location);
       invoke("get_weekly_summary").then((s) => setWeeklySummary(s)).catch(() => { });
@@ -524,6 +580,31 @@ function App() {
             </>
           );
         })()}
+      {overtimeModal && (
+        <div
+          className="edit-modal-overlay"
+          onClick={() => setOvertimeModal(null)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === "Escape" && setOvertimeModal(null)}
+          aria-label="Close modal"
+        >
+          <div className="edit-modal overtime-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Overtime this week</h3>
+            <p className="overtime-modal-text">
+              You&apos;ve already hit your weekly target. You can leave {formatDuration(overtimeModal.surplus_minutes)} early if you&apos;d like.
+            </p>
+            <div className="edit-modal-actions">
+              <button type="button" onClick={() => doStartSession(false)}>
+                No, work normally
+              </button>
+              <button type="button" onClick={() => doStartSession(true)} className="overtime-yes-btn">
+                Yes, leave early
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {editingSession && (
         <div
           className="edit-modal-overlay"
@@ -639,9 +720,10 @@ function App() {
       <section className="section settings-section">
         <h2>Settings</h2>
         <form onSubmit={handleSaveSettings} className="settings-form">
-          <label>
-            Expected hours per week
+          <div className="settings-field">
+            <label htmlFor="expected-hours">Expected hours per week</label>
             <input
+              id="expected-hours"
               type="number"
               min="1"
               max="168"
@@ -653,10 +735,11 @@ function App() {
               }}
               className="settings-input"
             />
-          </label>
-          <label>
-            Default location
+          </div>
+          <div className="settings-field">
+            <label htmlFor="default-location">Default location</label>
             <select
+              id="default-location"
               value={settings.default_location}
               onChange={(e) =>
                 setSettings((s) => ({ ...s, default_location: e.target.value }))
@@ -666,6 +749,16 @@ function App() {
               <option value="home">Home</option>
               <option value="office">Office</option>
             </select>
+          </div>
+          <label className="settings-checkbox-label">
+            <input
+              type="checkbox"
+              checked={settings.enable_overtime_alerts ?? true}
+              onChange={(e) =>
+                setSettings((s) => ({ ...s, enable_overtime_alerts: e.target.checked }))
+              }
+            />
+            Overtime alerts (Friday: &quot;leave early&quot; when over target)
           </label>
           <button type="submit" className="settings-save">
             {settingsSaved ? "Saved" : "Save"}

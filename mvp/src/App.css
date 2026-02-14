@@ -395,6 +395,27 @@
   justify-content: flex-end;
 }
 
+.overtime-modal-text {
+  margin: 0 0 1em 0;
+  color: #333;
+}
+
+.overtime-yes-btn {
+  background: #24c8db;
+  border-color: #24c8db;
+}
+
+.settings-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  cursor: pointer;
+}
+
+.settings-checkbox-label input {
+  width: auto;
+}
+
 .fy-section {
 
 .export-view h2,
@@ -477,33 +498,79 @@
 }
 
 .settings-section {
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
 
 .settings-section h2 {
   font-size: 1.1rem;
-  margin-bottom: 0.75em;
+  margin-bottom: 1.25em;
 }
 
 .settings-form {
   display: flex;
   flex-direction: column;
-  gap: 1em;
-  max-width: 280px;
+  gap: 1.5em;
+  padding: 1.5em;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-.settings-form label {
+.settings-form .settings-field {
   display: flex;
   flex-direction: column;
-  gap: 0.35em;
-  font-weight: 500;
+  gap: 0.5em;
 }
 
-.settings-input {
-  width: 4em;
-  padding: 0.4em 0.6em;
+.settings-form .settings-field label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.settings-form label:not(.settings-checkbox-label) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.settings-form .settings-input {
+  width: 6em;
+  padding: 0.6em 0.75em;
+  font-size: 1rem;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  background: #fff;
+}
+
+.settings-form .location-picker {
+  max-width: 12em;
+  padding: 0.6em 0.75em;
+  font-size: 1rem;
+}
+
+.settings-checkbox-label {
+  font-weight: 500;
+  font-size: 0.95rem;
 }
 
 .settings-save {
-  padding: 0.4em 1em;
+  padding: 0.6em 1.5em;
+  font-size: 1rem;
+  align-self: flex-start;
+  background: #24c8db;
+  border-color: #24c8db;
+  color: #0f0f0f;
+}
+
+.settings-save:hover {
+  background: #1eb5c9;
+  border-color: #1eb5c9;
 }
 
 a {
@@ -642,12 +709,28 @@ button.timer-btn {
     color: #f44336;
   }
 
-  .settings-input {
-    background-color: #1a1a1a;
-  }
-
   .edit-modal {
     background: #2f2f2f;
+  }
+
+  .settings-form {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .settings-form .settings-field label {
+    color: #ddd;
+  }
+
+  .settings-form .settings-input {
+    background: #1a1a1a;
+    border-color: #555;
+    color: #f6f6f6;
+  }
+
+  .settings-form .location-picker {
+    background: #1a1a1a;
+    border-color: #555;
   }
 
   .edit-modal-original {
@@ -656,6 +739,10 @@ button.timer-btn {
 
   .edit-modal-error {
     color: #f44336;
+  }
+
+  .overtime-modal-text {
+    color: #ddd;
   }
 
   a:hover {
