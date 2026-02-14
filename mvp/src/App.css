@@ -788,11 +788,17 @@ button.timer-btn {
   font-weight: 500;
   min-width: 7rem;
   border-radius: 12px;
-  transition: background 0.15s, transform 0.1s;
+  border: none;
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 2px 4px rgba(14, 165, 183, 0.3);
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
 }
 
 button.timer-btn:hover {
+  background: var(--accent-hover);
   transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(14, 165, 183, 0.35);
 }
 
 button.timer-btn:active {
