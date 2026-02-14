@@ -81,7 +81,7 @@ function App() {
   const [timerState, setTimerState] = useState({ status: "", elapsed_seconds: 0 });
   const [location, setLocation] = useState("home");
   const [sessions, setSessions] = useState([]);
-  const [settings, setSettings] = useState({ expected_hours_per_week: 40, default_location: "home", enable_overtime_alerts: true });
+  const [settings, setSettings] = useState({ expected_hours_per_week: 40, default_location: "home", enable_overtime_alerts: true, idle_detection_enabled: false, idle_threshold_minutes: 5 });
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [weeklySummary, setWeeklySummary] = useState(null);
   const [exportStatus, setExportStatus] = useState("");
@@ -352,6 +352,14 @@ function App() {
         key: "enable_overtime_alerts",
         value: settings.enable_overtime_alerts ? "1" : "0",
       });
+      await invoke("save_setting", {
+        key: "idle_detection_enabled",
+        value: settings.idle_detection_enabled ? "1" : "0",
+      });
+      await invoke("save_setting", {
+        key: "idle_threshold_minutes",
+        value: String(settings.idle_threshold_minutes ?? 5),
+      });
       setLocation(settings.default_location);
       invoke("get_weekly_summary").then((s) => setWeeklySummary(s)).catch(() => { });
       setSettingsSaved(true);
@@ -396,7 +404,9 @@ function App() {
           {formatElapsed(timerState.elapsed_seconds)}
         </span>
         <span className="timer-status" data-testid="timer-status">
-          {timerState.status || "—"}
+          {timerState.status === "paused" && timerState.paused_reason === "idle"
+            ? "paused (idle)"
+            : (timerState.status || "—")}
         </span>
       </div>
 
@@ -760,6 +770,35 @@ function App() {
             />
             Overtime alerts (Friday: &quot;leave early&quot; when over target)
           </label>
+          <label className="settings-checkbox-label">
+            <input
+              type="checkbox"
+              checked={settings.idle_detection_enabled ?? false}
+              onChange={(e) =>
+                setSettings((s) => ({ ...s, idle_detection_enabled: e.target.checked }))
+              }
+            />
+            Auto-pause when idle
+          </label>
+          {settings.idle_detection_enabled && (
+            <div className="settings-field">
+              <label htmlFor="idle-threshold">Idle threshold (minutes)</label>
+              <input
+                id="idle-threshold"
+                type="number"
+                min="1"
+                max="60"
+                value={settings.idle_threshold_minutes ?? 5}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  const m = isNaN(v) ? 5 : Math.max(1, Math.min(60, v));
+                  setSettings((s) => ({ ...s, idle_threshold_minutes: m }));
+                }}
+                className="settings-input"
+              />
+              <span className="settings-hint">Session auto-pauses after this many minutes of inactivity</span>
+            </div>
+          )}
           <button type="submit" className="settings-save">
             {settingsSaved ? "Saved" : "Save"}
           </button>

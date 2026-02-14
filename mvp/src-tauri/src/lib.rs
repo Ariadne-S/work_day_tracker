@@ -275,7 +275,10 @@ fn update_tray_tooltip<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     let tooltip = match db::get_timer_state_inner() {
         Ok((status, elapsed)) => match status.as_str() {
             "running" => format!("Work Day Tracker – Running: {}", format_elapsed_short(elapsed)),
-            "paused" => format!("Work Day Tracker – Paused: {}", format_elapsed_short(elapsed)),
+            "paused" => {
+                let suffix = if db::get_paused_due_to_idle() { " (idle)" } else { "" };
+                format!("Work Day Tracker – Paused{}: {}", suffix, format_elapsed_short(elapsed))
+            }
             _ => "Work Day Tracker".to_string(),
         },
         Err(_) => "Work Day Tracker".to_string(),
@@ -388,6 +391,31 @@ pub fn run() {
             std::thread::spawn(move || loop {
                 update_tray_tooltip(&handle_for_tooltip);
                 std::thread::sleep(std::time::Duration::from_secs(2));
+            });
+
+            // Idle detection: poll every 30s, pause when idle > threshold, resume when activity returns
+            let handle_for_idle = app.handle().clone();
+            std::thread::spawn(move || loop {
+                std::thread::sleep(std::time::Duration::from_secs(30));
+                let (enabled, threshold_secs) = db::get_idle_detection_config();
+                if !enabled {
+                    continue;
+                }
+                let Ok(idle_duration) = system_idle_time::get_idle_time() else { continue };
+                let idle_secs = idle_duration.as_secs();
+
+                if let Ok((status, _)) = db::get_timer_state_inner() {
+                    if status == "running" && idle_secs >= threshold_secs {
+                        let _ = db::pause_session_due_to_idle_impl();
+                        let _ = handle_for_idle.emit("timer-state-changed", ());
+                        update_tray_tooltip(&handle_for_idle);
+                    } else if status == "paused" && db::get_paused_due_to_idle() && idle_secs < 15 {
+                        // User returned (idle < 15s) -> auto-resume
+                        let _ = db::resume_session_impl();
+                        let _ = handle_for_idle.emit("timer-state-changed", ());
+                        update_tray_tooltip(&handle_for_idle);
+                    }
+                }
             });
 
             Ok(())

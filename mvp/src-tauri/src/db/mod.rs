@@ -44,6 +44,9 @@ pub fn init_at(path: &Path) -> Result<()> {
         INSERT OR IGNORE INTO settings (key, value) VALUES ('default_location', 'home');
         INSERT OR IGNORE INTO settings (key, value) VALUES ('enable_overtime_alerts', '1');
         INSERT OR IGNORE INTO settings (key, value) VALUES ('leave_early_target_minutes', '');
+        INSERT OR IGNORE INTO settings (key, value) VALUES ('idle_detection_enabled', '0');
+        INSERT OR IGNORE INTO settings (key, value) VALUES ('idle_threshold_minutes', '5');
+        INSERT OR IGNORE INTO settings (key, value) VALUES ('paused_due_to_idle', '0');
         ",
     )?;
     let mut guard = DB_PATH.lock().unwrap();
@@ -87,7 +90,19 @@ pub fn start_session_impl(location: &str) -> Result<i64> {
 }
 
 /// Pause the active running session. Stores current elapsed for display.
+/// Sets paused_due_to_idle = 0 (manual pause).
 pub fn pause_session_impl() -> Result<(), String> {
+    let _ = set_setting("paused_due_to_idle", "0");
+    pause_session_inner()
+}
+
+/// Pause due to idle detection. Sets paused_due_to_idle = 1.
+pub fn pause_session_due_to_idle_impl() -> Result<(), String> {
+    let _ = set_setting("paused_due_to_idle", "1");
+    pause_session_inner()
+}
+
+fn pause_session_inner() -> Result<(), String> {
     let session_id: String = get_setting("active_session_id").map_err(|e| e.to_string())?;
     if session_id.is_empty() || session_id == "0" {
         return Err("no active session".to_string());
@@ -105,8 +120,9 @@ pub fn pause_session_impl() -> Result<(), String> {
     Ok(())
 }
 
-/// Resume a paused session.
+/// Resume a paused session. Clears paused_due_to_idle.
 pub fn resume_session_impl() -> Result<(), String> {
+    let _ = set_setting("paused_due_to_idle", "0");
     let session_id: String = get_setting("active_session_id").map_err(|e| e.to_string())?;
     if session_id.is_empty() || session_id == "0" {
         return Err("no active session".to_string());
@@ -219,9 +235,34 @@ pub fn stop_session_impl(elapsed_seconds: u64) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     set_setting("active_session_id", "").map_err(|e| e.to_string())?;
     let _ = set_setting("leave_early_target_minutes", "");
+    let _ = set_setting("paused_due_to_idle", "0");
     set_setting("active_session_elapsed", "0").map_err(|e| e.to_string())?;
     set_setting("active_session_paused", "0").map_err(|e| e.to_string())?;
     Ok(())
+}
+
+/// Returns (enabled, threshold_seconds) for idle detection.
+pub fn get_idle_detection_config() -> (bool, u64) {
+    let enabled = get_setting("idle_detection_enabled")
+        .unwrap_or_else(|_| "0".to_string())
+        .parse::<u32>()
+        .unwrap_or(0)
+        == 1;
+    let mins: u64 = get_setting("idle_threshold_minutes")
+        .unwrap_or_else(|_| "5".to_string())
+        .parse()
+        .unwrap_or(5);
+    let secs = mins.saturating_mul(60);
+    (enabled, secs)
+}
+
+/// Returns true if current pause was due to idle detection.
+pub fn get_paused_due_to_idle() -> bool {
+    get_setting("paused_due_to_idle")
+        .unwrap_or_else(|_| "0".to_string())
+        .parse::<u32>()
+        .unwrap_or(0)
+        == 1
 }
 
 pub fn get_timer_state_inner() -> Result<(String, u64)> {
@@ -292,13 +333,15 @@ pub fn get_sessions_impl() -> Result<Vec<SessionRow>, String> {
     sessions.map_err(|e| e.to_string())
 }
 
-const USER_SETTING_KEYS: &[&str] = &["expected_hours_per_week", "default_location", "enable_overtime_alerts"];
+const USER_SETTING_KEYS: &[&str] = &["expected_hours_per_week", "default_location", "enable_overtime_alerts", "idle_detection_enabled", "idle_threshold_minutes"];
 
 #[derive(serde::Serialize)]
 pub struct Settings {
     pub expected_hours_per_week: u32,
     pub default_location: String,
     pub enable_overtime_alerts: bool,
+    pub idle_detection_enabled: bool,
+    pub idle_threshold_minutes: u32,
 }
 
 /// Get user-facing settings (excludes internal keys like active_session_*).
@@ -318,10 +361,22 @@ pub fn get_settings_impl() -> Result<Settings, String> {
         .parse::<u32>()
         .unwrap_or(1)
         != 0;
+    let idle_detection_enabled = get_setting("idle_detection_enabled")
+        .unwrap_or_else(|_| "0".to_string())
+        .parse::<u32>()
+        .unwrap_or(0)
+        != 0;
+    let idle_threshold_minutes = get_setting("idle_threshold_minutes")
+        .unwrap_or_else(|_| "5".to_string())
+        .parse::<u32>()
+        .unwrap_or(5);
+    let idle_threshold_minutes = idle_threshold_minutes.clamp(1, 60);
     Ok(Settings {
         expected_hours_per_week: expected,
         default_location,
         enable_overtime_alerts,
+        idle_detection_enabled,
+        idle_threshold_minutes,
     })
 }
 
@@ -335,6 +390,15 @@ pub fn save_setting_impl(key: &str, value: &str) -> Result<(), String> {
     }
     if key == "enable_overtime_alerts" && value != "0" && value != "1" {
         return Err("enable_overtime_alerts must be '0' or '1'".to_string());
+    }
+    if key == "idle_detection_enabled" && value != "0" && value != "1" {
+        return Err("idle_detection_enabled must be '0' or '1'".to_string());
+    }
+    if key == "idle_threshold_minutes" {
+        let n: u32 = value.parse().map_err(|_| "idle_threshold_minutes must be 1–60".to_string())?;
+        if !(1..=60).contains(&n) {
+            return Err("idle_threshold_minutes must be 1–60".to_string());
+        }
     }
     set_setting(key, value).map_err(|e| e.to_string())
 }

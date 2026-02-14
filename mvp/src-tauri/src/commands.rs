@@ -10,14 +10,23 @@ pub fn ping() -> String {
 pub struct TimerState {
     pub status: String,
     pub elapsed_seconds: u64,
+    /// When paused: "idle" if auto-paused due to inactivity, else absent
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub paused_reason: Option<String>,
 }
 
 #[tauri::command]
 pub fn get_timer_state() -> Result<TimerState, String> {
     let (status, elapsed) = db::get_timer_state_inner().map_err(|e| e.to_string())?;
+    let paused_reason = if status == "paused" && db::get_paused_due_to_idle() {
+        Some("idle".to_string())
+    } else {
+        None
+    };
     Ok(TimerState {
         status,
         elapsed_seconds: elapsed,
+        paused_reason,
     })
 }
 

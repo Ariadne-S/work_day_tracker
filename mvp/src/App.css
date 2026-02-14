@@ -416,6 +416,12 @@
   width: auto;
 }
 
+.settings-hint {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 0.25em;
+}
+
 .fy-section {
 
 .export-view h2,
@@ -731,6 +737,10 @@ button.timer-btn {
   .settings-form .location-picker {
     background: #1a1a1a;
     border-color: #555;
+  }
+
+  .settings-hint {
+    color: #888;
   }
 
   .edit-modal-original {
