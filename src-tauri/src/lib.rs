@@ -327,7 +327,7 @@ pub fn run() {
                 .separator()
                 .text("quick_log_home", "Quick log (Home)")
                 .text("quick_log_office", "Quick log (Office)")
-                .text("quick_log_sick", "Quick log (Sick)")
+                .text("quick_log_away", "Quick log (Away)")
                 .separator()
                 .text("pause", "Pause")
                 .text("resume", "Resume")
@@ -382,8 +382,8 @@ pub fn run() {
                         let _ = app.emit("timer-state-changed", ());
                         update_tray_tooltip(app);
                     }
-                    "quick_log_sick" => {
-                        let _ = db::quick_log_with_location_impl("sick");
+                    "quick_log_away" => {
+                        let _ = db::quick_log_with_location_impl("away");
                         let _ = app.emit("timer-state-changed", ());
                         update_tray_tooltip(app);
                     }

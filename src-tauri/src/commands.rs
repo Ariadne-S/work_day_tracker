@@ -1,11 +1,13 @@
 use crate::db;
 use serde::Serialize;
 
+/// Health check. Returns "pong".
 #[tauri::command]
 pub fn ping() -> String {
     "pong".to_string()
 }
 
+/// Timer status and elapsed seconds. Used for display and idle/overtime logic.
 #[derive(Serialize)]
 pub struct TimerState {
     pub status: String,
@@ -15,6 +17,7 @@ pub struct TimerState {
     pub paused_reason: Option<String>,
 }
 
+/// Get current timer state (idle/running/paused) and elapsed seconds.
 #[tauri::command]
 pub fn get_timer_state() -> Result<TimerState, String> {
     let (status, elapsed) = db::get_timer_state_inner().map_err(|e| e.to_string())?;
@@ -30,27 +33,32 @@ pub fn get_timer_state() -> Result<TimerState, String> {
     })
 }
 
+/// Start a new session. Location defaults to "home" if not provided.
 #[tauri::command]
 pub fn start_session(location: Option<String>) -> Result<i64, String> {
     let loc = location.unwrap_or_else(|| "home".to_string());
     db::start_session_impl(&loc).map_err(|e| e.to_string())
 }
 
+/// Stop the active session with the given elapsed seconds. Completes the session record.
 #[tauri::command]
 pub fn stop_session(elapsed_seconds: u64) -> Result<(), String> {
     db::stop_session_impl(elapsed_seconds)
 }
 
+/// Pause the active running session. Elapsed time is stored for resume.
 #[tauri::command]
 pub fn pause_session() -> Result<(), String> {
     db::pause_session_impl()
 }
 
+/// Resume a paused session. Time continues from where it was paused.
 #[tauri::command]
 pub fn resume_session() -> Result<(), String> {
     db::resume_session_impl()
 }
 
+/// Get all completed sessions, newest first.
 #[tauri::command]
 pub fn get_sessions() -> Result<Vec<db::SessionRow>, String> {
     db::get_sessions_impl()
@@ -84,16 +92,19 @@ pub fn delete_session(session_id: i64) -> Result<(), String> {
     db::delete_session_impl(session_id)
 }
 
+/// Get user-facing settings (expected hours, location, theme, etc.).
 #[tauri::command]
 pub fn get_settings() -> Result<db::Settings, String> {
     db::get_settings_impl()
 }
 
+/// Persist a single setting. Only whitelisted keys are accepted.
 #[tauri::command]
 pub fn save_setting(key: String, value: String) -> Result<(), String> {
     db::save_setting_impl(&key, &value)
 }
 
+/// Get weekly summary: actual vs expected minutes for the current week.
 #[tauri::command]
 pub fn get_weekly_summary() -> Result<db::WeeklySummary, String> {
     db::get_weekly_summary_impl()

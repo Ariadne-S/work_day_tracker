@@ -1,5 +1,7 @@
 # Code Review – Work Day Tracker MVP
 
+> **Note:** Many recommendations below have been implemented. See "Suggested quick wins" section.
+
 ## Summary
 
 Review of the codebase for redundancy, structure, and UX. Recommendations ordered by impact.

@@ -1,8 +1,10 @@
-// Standalone binary to seed sample data.
-// Run: cargo run --bin seed
-// To clear existing sessions and re-seed: cargo run --bin seed -- --force
+//! Standalone binary to seed sample data.
+//! Run: `cargo run --bin seed`
+//! To clear existing sessions and re-seed: `cargo run --bin seed -- --force`
+
 use std::path::PathBuf;
 
+/// Returns the app data directory path (platform-specific).
 fn app_data_dir() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
     #[cfg(target_os = "macos")]

@@ -6,6 +6,7 @@ use tauri::Manager;
 
 static DB_PATH: Mutex<Option<std::path::PathBuf>> = Mutex::new(None);
 
+/// Initialize database in app data directory. Called at app startup.
 pub fn init(app_handle: &tauri::AppHandle) -> Result<()> {
     let app_data = app_handle
         .path()
@@ -49,6 +50,7 @@ pub fn init_at(path: &Path) -> Result<()> {
         INSERT OR IGNORE INTO settings (key, value) VALUES ('paused_due_to_idle', '0');
         INSERT OR IGNORE INTO settings (key, value) VALUES ('theme', 'light');
         INSERT OR IGNORE INTO settings (key, value) VALUES ('default_view', 'tracker');
+        UPDATE sessions SET location = 'away' WHERE location = 'sick';
         ",
     )?;
     let mut guard = DB_PATH.lock().unwrap();
@@ -62,12 +64,14 @@ pub fn get_db_path() -> Option<std::path::PathBuf> {
     guard.clone()
 }
 
+/// Get a connection to the database. Panics if not initialized.
 fn get_connection() -> Result<Connection> {
     let guard = DB_PATH.lock().unwrap();
     let path = guard.as_ref().expect("db not initialized");
     Connection::open(path)
 }
 
+/// Read a setting value by key.
 fn get_setting(key: &str) -> Result<String> {
     get_connection()?.query_row(
         "SELECT value FROM settings WHERE key = ?1",
@@ -76,6 +80,7 @@ fn get_setting(key: &str) -> Result<String> {
     )
 }
 
+/// Write a setting key-value pair.
 fn set_setting(key: &str, value: &str) -> Result<()> {
     get_connection()?.execute(
         "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
@@ -115,6 +120,7 @@ pub fn pause_session_due_to_idle_impl() -> Result<(), String> {
     pause_session_inner()
 }
 
+/// Internal: pause logic shared by manual and idle-triggered pause.
 fn pause_session_inner() -> Result<(), String> {
     let session_id: String = get_setting("active_session_id").map_err(|e| e.to_string())?;
     if session_id.is_empty() || session_id == "0" {
@@ -203,15 +209,15 @@ pub fn update_session_impl(
     Ok(())
 }
 
-/// Quick log with explicit location: today's date. For sick days uses 0 hours; otherwise expected_hours/5.
+/// Quick log with explicit location: today's date. For "away" uses 0 hours; otherwise expected_hours/5.
 pub fn quick_log_with_location_impl(location: &str) -> Result<i64, String> {
     let date = Utc::now().format("%Y-%m-%d").to_string();
     let location = match location {
         "office" => "office",
-        "sick" => "sick",
+        "away" => "away",
         _ => "home",
     };
-    let duration_minutes = if location == "sick" {
+    let duration_minutes = if location == "away" {
         0
     } else {
         let expected_hours: u32 = get_setting("expected_hours_per_week")
@@ -232,12 +238,12 @@ pub fn quick_log_with_defaults_impl() -> Result<i64, String> {
 }
 
 /// Log a full work day without using the timer. Inserts a completed session.
-/// For sick days, duration_minutes may be 0. Otherwise must be 1–1440.
+/// For "away" (non-work days), duration_minutes may be 0. Otherwise must be 1–1440.
 pub fn log_full_day_impl(date: &str, location: &str, duration_minutes: i32) -> Result<i64, String> {
-    let allow_zero = location == "sick";
+    let allow_zero = location == "away";
     if duration_minutes < 0 || duration_minutes > 24 * 60 || (duration_minutes == 0 && !allow_zero)
     {
-        return Err("duration must be 1–1440 minutes (or 0 for sick days)".to_string());
+        return Err("duration must be 1–1440 minutes (or 0 for away days)".to_string());
     }
     let start_time = format!("{} 09:00:00", date);
     let start = chrono::NaiveDateTime::parse_from_str(&start_time, "%Y-%m-%d %H:%M:%S")
@@ -302,6 +308,7 @@ pub fn get_paused_due_to_idle() -> bool {
         == 1
 }
 
+/// Get (status, elapsed_seconds). Status is "idle", "running", or "paused".
 pub fn get_timer_state_inner() -> Result<(String, u64)> {
     let session_id: String = get_setting("active_session_id").unwrap_or_default();
     let paused: u32 = get_setting("active_session_paused")
@@ -334,6 +341,7 @@ pub fn get_timer_state_inner() -> Result<(String, u64)> {
     Ok((status, elapsed))
 }
 
+/// A completed session row for list display and export.
 #[derive(serde::Serialize)]
 pub struct SessionRow {
     pub id: i64,
@@ -387,6 +395,7 @@ const USER_SETTING_KEYS: &[&str] = &[
     "theme",
 ];
 
+/// User-facing settings loaded from the database.
 #[derive(serde::Serialize)]
 pub struct Settings {
     pub expected_hours_per_week: u32,
@@ -479,6 +488,7 @@ pub fn save_setting_impl(key: &str, value: &str) -> Result<(), String> {
     set_setting(key, value).map_err(|e| e.to_string())
 }
 
+/// Weekly totals: actual vs expected minutes for the current ISO week.
 #[derive(serde::Serialize)]
 pub struct WeeklySummary {
     pub week_start: String,
@@ -529,6 +539,7 @@ pub struct OvertimeStatus {
     pub surplus_minutes: u32,
 }
 
+/// Friday overtime check: show "leave early" modal when over target.
 pub fn get_overtime_status_impl() -> Result<OvertimeStatus, String> {
     let now = Utc::now().date_naive();
     let is_friday = now.weekday() == chrono::Weekday::Fri;
@@ -549,10 +560,12 @@ pub fn get_overtime_status_impl() -> Result<OvertimeStatus, String> {
     })
 }
 
+/// Set minutes-to-work-today before "work week accomplished" alert. Cleared on stop.
 pub fn set_leave_early_target_impl(minutes: u32) -> Result<(), String> {
     set_setting("leave_early_target_minutes", &minutes.to_string()).map_err(|e| e.to_string())
 }
 
+/// Get leave-early target minutes, if set.
 pub fn get_leave_early_target_impl() -> Result<Option<u32>, String> {
     let v = get_setting("leave_early_target_minutes").unwrap_or_default();
     if v.is_empty() {

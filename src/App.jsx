@@ -6,6 +6,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import "./App.css";
 
+/** Format seconds as HH:MM:SS. */
 function formatElapsed(seconds) {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -13,17 +14,20 @@ function formatElapsed(seconds) {
   return [h, m, s].map((n) => String(n).padStart(2, "0")).join(":");
 }
 
+/** Fetch timer state from backend and update state. */
 function refreshState(setTimerState) {
   invoke("get_timer_state")
     .then((s) => setTimerState(s))
     .catch((e) => setTimerState({ status: `Error: ${e}`, elapsed_seconds: 0 }));
 }
 
+/** Format ISO date string (YYYY-MM-DD) for display. */
 function formatDate(isoDate) {
   if (!isoDate) return "—";
   return format(new Date(isoDate + "T12:00:00"), "dd MMM yyyy");
 }
 
+/** Format duration in minutes as e.g. "2h 30m". */
 function formatDuration(minutes) {
   if (minutes == null) return "—";
   const h = Math.floor(minutes / 60);
@@ -33,12 +37,14 @@ function formatDuration(minutes) {
   return `${m}m`;
 }
 
+/** Fetch sessions from backend. */
 function refreshSessions(setSessions) {
   invoke("get_sessions")
     .then((s) => setSessions(s))
     .catch(() => setSessions([]));
 }
 
+/** Refresh sessions, weekly summary, and financial years in one call. */
 function refreshAppData(setSessions, setWeeklySummary, setFinancialYears) {
   refreshSessions(setSessions);
   invoke("get_weekly_summary")
@@ -49,6 +55,7 @@ function refreshAppData(setSessions, setWeeklySummary, setFinancialYears) {
     .catch(() => setFinancialYears([]));
 }
 
+/** Open folder picker and write CSV file. Returns true if saved. */
 async function saveCsvToFolder(csv, filename, title = "Choose folder to save") {
   const dir = await open({ directory: true, title });
   if (!dir) return false;
@@ -59,6 +66,7 @@ async function saveCsvToFolder(csv, filename, title = "Choose folder to save") {
 
 const SESSION_DISPLAY_INCREMENT = 15;
 
+/** Filter sessions by "all" | "today" | "week" | "month". */
 function filterSessions(sessions, filter) {
   if (!sessions.length || filter === "all") return sessions;
   const now = new Date();
@@ -131,10 +139,7 @@ function App() {
 
   useEffect(() => {
     refreshState(setTimerState);
-    refreshSessions(setSessions);
-    invoke("get_weekly_summary")
-      .then((s) => setWeeklySummary(s))
-      .catch(() => setWeeklySummary(null));
+    refreshAppData(setSessions, setWeeklySummary, setFinancialYears);
     invoke("get_settings")
       .then((s) => {
         const theme = s.theme || "light";
@@ -145,9 +150,6 @@ function App() {
         applyTheme(theme);
       })
       .catch(() => {});
-    invoke("get_financial_years_with_data")
-      .then((fys) => setFinancialYears(fys))
-      .catch(() => setFinancialYears([]));
 
     const unlistenTimer = listen("timer-state-changed", () => {
       refreshState(setTimerState);
@@ -386,8 +388,8 @@ function App() {
   async function handleLogDay(e) {
     e.preventDefault();
     try {
-      const mins = logDayLocation === "sick" ? 0 : Math.round(logDayHours * 60);
-      if (logDayLocation !== "sick" && (mins < 1 || mins > 24 * 60)) {
+      const mins = logDayLocation === "away" ? 0 : Math.round(logDayHours * 60);
+      if (logDayLocation !== "away" && (mins < 1 || mins > 24 * 60)) {
         showToast("Hours must be between 0.01 and 24", "error");
         return;
       }
@@ -397,7 +399,7 @@ function App() {
         durationMinutes: mins,
       });
       refreshAppData(setSessions, setWeeklySummary, setFinancialYears);
-      showToast(logDayLocation === "sick" ? "Sick day logged" : "Day logged");
+      showToast(logDayLocation === "away" ? "Day away logged" : "Day logged");
     } catch (err) {
       showToast(`Error: ${err}`, "error");
     }
@@ -649,10 +651,10 @@ function App() {
                 >
                   <option value="home">Home</option>
                   <option value="office">Office</option>
-                  <option value="sick">Sick</option>
+                  <option value="away">Away</option>
                 </select>
               </label>
-              {logDayLocation !== "sick" && (
+              {logDayLocation !== "away" && (
                 <label>
                   Hours
                   <input
@@ -668,7 +670,7 @@ function App() {
               )}
             </div>
             <button type="submit" className="log-day-btn">
-              {logDayLocation === "sick" ? "Log sick day" : "Log day"}
+              {logDayLocation === "away" ? "Log day away" : "Log day"}
             </button>
           </form>
         </section>

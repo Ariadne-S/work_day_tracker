@@ -7,7 +7,7 @@ A cross-platform menu bar application that tracks work hours and location (home/
 - **Timer** – Start, stop, pause, and resume work sessions
 - **Location** – Track whether you worked from home or office
 - **Weekly summary** – Actual vs expected hours for the current week
-- **Quick log** – Log a full day without using the timer (date, location: home/office/sick, hours). Sick days use 0 hours for export.
+- **Quick log** – Log a full day without using the timer (date, location: home/office/away, hours). Away days use 0 hours for export.
 - **Edit & delete sessions** – Adjust duration, add notes, or remove sessions (with confirmation)
 - **Overtime alerts** – On Fridays, prompts to leave early when weekly target is hit
 - **Idle detection** – Optional auto-pause when inactive, auto-resume on activity
@@ -61,12 +61,23 @@ To clear existing sessions and re-seed:
 cargo run --bin seed -- --force
 ```
 
-Data is stored in the app data directory (e.g. `~/Library/Application Support/com.workdaytracker.app/` on macOS).
+Data is stored in the app data directory:
+- **macOS**: `~/Library/Application Support/com.workdaytracker.app/`
+- **Windows**: `%APPDATA%\com.workdaytracker.app\`
+- **Linux**: `~/.local/share/com.workdaytracker.app/`
 
 ## Tests
 
 ```bash
 cargo test
+```
+
+## CI
+
+Run lint, format, typecheck (frontend) and fmt, clippy (Rust):
+
+```bash
+npm run ci
 ```
 
 ## Project structure
