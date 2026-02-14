@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import "./App.css";
 
 function formatElapsed(seconds) {
@@ -56,6 +57,15 @@ function App() {
         setLocation(s.default_location || "home");
       })
       .catch(() => { });
+
+    const unlisten = listen("timer-state-changed", () => {
+      refreshState(setTimerState);
+      refreshSessions(setSessions);
+      invoke("get_weekly_summary").then((s) => setWeeklySummary(s)).catch(() => {});
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
   }, []);
 
   useEffect(() => {

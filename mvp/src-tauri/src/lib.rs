@@ -2,6 +2,7 @@ mod commands;
 mod db;
 
 use commands::{get_sessions, get_settings, get_timer_state, get_weekly_summary, pause_session, ping, resume_session, save_setting, start_session, stop_session};
+use tauri::{Emitter, Manager};
 
 #[cfg(test)]
 mod tests {
@@ -147,15 +148,126 @@ mod tests {
     }
 }
 
+fn format_elapsed_short(seconds: u64) -> String {
+    let h = seconds / 3600;
+    let m = (seconds % 3600) / 60;
+    if h > 0 {
+        format!("{}h {}m", h, m)
+    } else {
+        format!("{}m", m)
+    }
+}
+
+fn update_tray_tooltip<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    let tooltip = match db::get_timer_state_inner() {
+        Ok((status, elapsed)) => match status.as_str() {
+            "running" => format!("Work Day Tracker – Running: {}", format_elapsed_short(elapsed)),
+            "paused" => format!("Work Day Tracker – Paused: {}", format_elapsed_short(elapsed)),
+            _ => "Work Day Tracker".to_string(),
+        },
+        Err(_) => "Work Day Tracker".to_string(),
+    };
+    let app_for_closure = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        if let Some(tray) = app_for_closure.tray_by_id("main") {
+            let _ = tray.set_tooltip(Some(tooltip));
+        }
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             db::init(app.handle()).expect("failed to init db");
+
+            use tauri::menu::MenuBuilder;
+            let menu = MenuBuilder::new(app)
+                .text("start_home", "Start (Home)")
+                .text("start_office", "Start (Office)")
+                .separator()
+                .text("pause", "Pause")
+                .text("resume", "Resume")
+                .text("stop", "Stop")
+                .separator()
+                .text("show", "Show")
+                .text("quit", "Quit")
+                .build()
+                .expect("failed to create tray menu");
+
+            let handle = app.handle().clone();
+            let _tray = tauri::tray::TrayIconBuilder::with_id("main")
+                .icon(app.default_window_icon().unwrap().clone())
+                .tooltip("Work Day Tracker")
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .on_tray_icon_event(move |_tray, event| {
+                    use tauri::tray::TrayIconEvent;
+                    if matches!(event, TrayIconEvent::Click { .. }) {
+                        if let Some(w) = handle.get_webview_window("main") {
+                            let _ = w.show();
+                            let _ = w.set_focus();
+                        }
+                    }
+                })
+                .on_menu_event(move |app, event| {
+                    match event.id.as_ref() {
+                        "show" => {
+                            if let Some(w) = app.get_webview_window("main") {
+                                let _ = w.show();
+                                let _ = w.set_focus();
+                            }
+                        }
+                        "quit" => app.exit(0),
+                        "start_home" => {
+                            let _ = db::start_session_impl("home");
+                            let _ = app.emit("timer-state-changed", ());
+                            update_tray_tooltip(app);
+                        }
+                        "start_office" => {
+                            let _ = db::start_session_impl("office");
+                            let _ = app.emit("timer-state-changed", ());
+                            update_tray_tooltip(app);
+                        }
+                        "pause" => {
+                            let _ = db::pause_session_impl();
+                            let _ = app.emit("timer-state-changed", ());
+                            update_tray_tooltip(app);
+                        }
+                        "resume" => {
+                            let _ = db::resume_session_impl();
+                            let _ = app.emit("timer-state-changed", ());
+                            update_tray_tooltip(app);
+                        }
+                        "stop" => {
+                            if let Ok((_, elapsed)) = db::get_timer_state_inner() {
+                                let _ = db::stop_session_impl(elapsed);
+                            }
+                            let _ = app.emit("timer-state-changed", ());
+                            update_tray_tooltip(app);
+                        }
+                        _ => {}
+                    }
+                })
+                .build(app)
+                .expect("failed to build tray");
+
+            // Spawn thread to update tooltip every 2 seconds
+            let handle_for_tooltip = app.handle().clone();
+            std::thread::spawn(move || loop {
+                update_tray_tooltip(&handle_for_tooltip);
+                std::thread::sleep(std::time::Duration::from_secs(2));
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![ping, get_timer_state, start_session, stop_session, pause_session, resume_session, get_sessions, get_settings, save_setting, get_weekly_summary])
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                window.hide().unwrap();
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
