@@ -1,0 +1,184 @@
+use chrono::Utc;
+use rusqlite::{params, Connection, Result};
+use std::path::Path;
+use std::sync::Mutex;
+use tauri::Manager;
+
+static DB_PATH: Mutex<Option<std::path::PathBuf>> = Mutex::new(None);
+
+pub fn init(app_handle: &tauri::AppHandle) -> Result<()> {
+    let app_data = app_handle
+        .path()
+        .app_data_dir()
+        .expect("failed to get app data dir");
+    std::fs::create_dir_all(&app_data).expect("failed to create app data dir");
+    let path = app_data.join("work_day_tracker.db");
+    init_at(&path)
+}
+
+/// Initialize DB at path (for tests, use ":memory:" or temp path)
+pub fn init_at(path: &Path) -> Result<()> {
+    let conn = Connection::open(path)?;
+    conn.execute_batch(
+        r"
+        CREATE TABLE IF NOT EXISTS sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            start_time TEXT NOT NULL,
+            end_time TEXT,
+            duration_minutes INTEGER,
+            location TEXT NOT NULL DEFAULT 'home',
+            notes TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+
+        INSERT OR IGNORE INTO settings (key, value) VALUES ('active_session_id', '');
+        INSERT OR IGNORE INTO settings (key, value) VALUES ('active_session_elapsed', '0');
+        INSERT OR IGNORE INTO settings (key, value) VALUES ('active_session_paused', '0');
+        ",
+    )?;
+    let mut guard = DB_PATH.lock().unwrap();
+    *guard = Some(path.to_path_buf());
+    Ok(())
+}
+
+fn get_connection() -> Result<Connection> {
+    let guard = DB_PATH.lock().unwrap();
+    let path = guard.as_ref().expect("db not initialized");
+    Connection::open(path)
+}
+
+fn get_setting(key: &str) -> Result<String> {
+    get_connection()?
+        .query_row("SELECT value FROM settings WHERE key = ?1", params![key], |row| row.get(0))
+}
+
+fn set_setting(key: &str, value: &str) -> Result<()> {
+    get_connection()?
+        .execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)", params![key, value])?;
+    Ok(())
+}
+
+/// Create a new session, set it as active. Returns session id.
+pub fn start_session_impl(location: &str) -> Result<i64> {
+    let now = Utc::now();
+    let date = now.format("%Y-%m-%d").to_string();
+    let start_time = now.format("%Y-%m-%d %H:%M:%S").to_string();
+
+    let conn = get_connection()?;
+    conn.execute(
+        "INSERT INTO sessions (date, start_time, location) VALUES (?1, ?2, ?3)",
+        params![date, start_time, location],
+    )?;
+    let id = conn.last_insert_rowid();
+    set_setting("active_session_id", &id.to_string())?;
+    set_setting("active_session_elapsed", "0")?;
+    set_setting("active_session_paused", "0")?;
+    Ok(id)
+}
+
+/// Pause the active running session. Stores current elapsed for display.
+pub fn pause_session_impl() -> Result<(), String> {
+    let session_id: String = get_setting("active_session_id").map_err(|e| e.to_string())?;
+    if session_id.is_empty() || session_id == "0" {
+        return Err("no active session".to_string());
+    }
+    let paused: u32 = get_setting("active_session_paused")
+        .unwrap_or_else(|_| "0".to_string())
+        .parse()
+        .unwrap_or(0);
+    if paused == 1 {
+        return Err("session already paused".to_string());
+    }
+    let (_, elapsed) = get_timer_state_inner().map_err(|e| e.to_string())?;
+    set_setting("active_session_elapsed", &elapsed.to_string()).map_err(|e| e.to_string())?;
+    set_setting("active_session_paused", "1").map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Resume a paused session.
+pub fn resume_session_impl() -> Result<(), String> {
+    let session_id: String = get_setting("active_session_id").map_err(|e| e.to_string())?;
+    if session_id.is_empty() || session_id == "0" {
+        return Err("no active session".to_string());
+    }
+    let paused: u32 = get_setting("active_session_paused")
+        .unwrap_or_else(|_| "0".to_string())
+        .parse()
+        .unwrap_or(0);
+    if paused != 1 {
+        return Err("session not paused".to_string());
+    }
+    let elapsed: u64 = get_setting("active_session_elapsed")
+        .unwrap_or_else(|_| "0".to_string())
+        .parse()
+        .unwrap_or(0);
+    set_setting("active_session_paused", "0").map_err(|e| e.to_string())?;
+    // Adjust session start_time so (now - start_time) = elapsed when we compute running elapsed
+    let new_start = Utc::now() - chrono::Duration::seconds(elapsed as i64);
+    let new_start_str = new_start.format("%Y-%m-%d %H:%M:%S").to_string();
+    get_connection()
+        .map_err(|e| e.to_string())?
+        .execute("UPDATE sessions SET start_time = ?1 WHERE id = ?2", params![new_start_str, session_id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Stop the active session with final elapsed seconds.
+pub fn stop_session_impl(elapsed_seconds: u64) -> Result<(), String> {
+    let session_id: String = get_setting("active_session_id").map_err(|e| e.to_string())?;
+    if session_id.is_empty() || session_id == "0" {
+        return Err("no active session".to_string());
+    }
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let duration_minutes = (elapsed_seconds / 60) as i32;
+
+    get_connection()
+        .map_err(|e| e.to_string())?
+        .execute(
+        "UPDATE sessions SET end_time = ?1, duration_minutes = ?2 WHERE id = ?3",
+        params![now, duration_minutes, session_id],
+        )
+        .map_err(|e| e.to_string())?;
+    set_setting("active_session_id", "").map_err(|e| e.to_string())?;
+    set_setting("active_session_elapsed", "0").map_err(|e| e.to_string())?;
+    set_setting("active_session_paused", "0").map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub fn get_timer_state_inner() -> Result<(String, u64)> {
+    let session_id: String = get_setting("active_session_id").unwrap_or_default();
+    let paused: u32 = get_setting("active_session_paused")
+        .unwrap_or_else(|_| "0".to_string())
+        .parse()
+        .unwrap_or(0);
+
+    let (status, elapsed) = if session_id.is_empty() || session_id == "0" {
+        ("idle".to_string(), 0u64)
+    } else if paused == 1 {
+        let elapsed: u64 = get_setting("active_session_elapsed")
+            .unwrap_or_else(|_| "0".to_string())
+            .parse()
+            .unwrap_or(0);
+        ("paused".to_string(), elapsed)
+    } else {
+        let conn = get_connection()?;
+        let start_time: String = conn.query_row(
+            "SELECT start_time FROM sessions WHERE id = ?1",
+            params![session_id],
+            |row| row.get(0),
+        )?;
+        let start = chrono::NaiveDateTime::parse_from_str(&start_time, "%Y-%m-%d %H:%M:%S")
+            .map(|dt| dt.and_utc())
+            .unwrap_or_else(|_| Utc::now());
+        let elapsed = (Utc::now() - start).num_seconds().max(0) as u64;
+        ("running".to_string(), elapsed)
+    };
+
+    Ok((status, elapsed))
+}
