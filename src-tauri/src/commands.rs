@@ -68,10 +68,14 @@ pub fn quick_log_with_defaults() -> Result<i64, String> {
     db::quick_log_with_defaults_impl()
 }
 
-/// Update duration of a completed session.
+/// Update duration and optionally notes of a completed session.
 #[tauri::command]
-pub fn update_session_duration(session_id: i64, new_duration_minutes: i32) -> Result<(), String> {
-    db::update_session_duration_impl(session_id, new_duration_minutes)
+pub fn update_session(
+    session_id: i64,
+    new_duration_minutes: i32,
+    notes: Option<String>,
+) -> Result<(), String> {
+    db::update_session_impl(session_id, new_duration_minutes, notes)
 }
 
 /// Delete a completed session.
@@ -136,4 +140,18 @@ pub fn get_export_csv_for_fy(fy: u32) -> Result<String, String> {
 #[tauri::command]
 pub fn seed_sample_data(force: Option<bool>) -> Result<u32, String> {
     db::seed_sample_data_impl(force.unwrap_or(false))
+}
+
+/// Copy the database file to the given destination path. Used for backup.
+#[tauri::command]
+pub fn backup_database(dest_path: String) -> Result<(), String> {
+    let src = db::get_db_path().ok_or("database not initialized")?;
+    std::fs::copy(&src, &dest_path).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Exit the application. Called by frontend after user confirms quit with running session.
+#[tauri::command]
+pub fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
 }

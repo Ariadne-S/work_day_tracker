@@ -56,6 +56,12 @@ pub fn init_at(path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Returns the database file path, if initialized. Used for backup.
+pub fn get_db_path() -> Option<std::path::PathBuf> {
+    let guard = DB_PATH.lock().unwrap();
+    guard.clone()
+}
+
 fn get_connection() -> Result<Connection> {
     let guard = DB_PATH.lock().unwrap();
     let path = guard.as_ref().expect("db not initialized");
@@ -166,16 +172,21 @@ pub fn delete_session_impl(session_id: i64) -> Result<(), String> {
     Ok(())
 }
 
-/// Update the duration of a completed session.
-pub fn update_session_duration_impl(session_id: i64, new_duration_minutes: i32) -> Result<(), String> {
+/// Update the duration (and optionally notes) of a completed session.
+pub fn update_session_impl(
+    session_id: i64,
+    new_duration_minutes: i32,
+    notes: Option<String>,
+) -> Result<(), String> {
     if new_duration_minutes <= 0 || new_duration_minutes > 24 * 60 {
         return Err("duration must be between 1 and 1440 minutes".to_string());
     }
     let conn = get_connection().map_err(|e| e.to_string())?;
+    let notes_value = notes.unwrap_or_default();
     let rows = conn
         .execute(
-            "UPDATE sessions SET duration_minutes = ?1 WHERE id = ?2 AND end_time IS NOT NULL",
-            params![new_duration_minutes, session_id],
+            "UPDATE sessions SET duration_minutes = ?1, notes = ?2 WHERE id = ?3 AND end_time IS NOT NULL",
+            params![new_duration_minutes, notes_value, session_id],
         )
         .map_err(|e| e.to_string())?;
     if rows == 0 {
@@ -325,6 +336,8 @@ pub struct SessionRow {
     pub end_time: Option<String>,
     pub duration_minutes: Option<i32>,
     pub location: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
 }
 
 /// List completed sessions (with end_time), newest first.
@@ -332,7 +345,7 @@ pub fn get_sessions_impl() -> Result<Vec<SessionRow>, String> {
     let conn = get_connection().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, date, start_time, end_time, duration_minutes, location
+            "SELECT id, date, start_time, end_time, duration_minutes, location, notes
              FROM sessions WHERE end_time IS NOT NULL
              ORDER BY date DESC, start_time DESC",
         )
@@ -346,6 +359,7 @@ pub fn get_sessions_impl() -> Result<Vec<SessionRow>, String> {
                 end_time: row.get(3)?,
                 duration_minutes: row.get(4)?,
                 location: row.get(5)?,
+                notes: row.get::<_, Option<String>>(6).ok().flatten().filter(|s| !s.is_empty()),
             })
         })
         .map_err(|e| e.to_string())?;

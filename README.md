@@ -8,12 +8,16 @@ A cross-platform menu bar application that tracks work hours and location (home/
 - **Location** – Track whether you worked from home or office
 - **Weekly summary** – Actual vs expected hours for the current week
 - **Quick log** – Log a full day without using the timer (date, location: home/office/sick, hours). Sick days use 0 hours for export.
-- **Edit & delete sessions** – Adjust duration or remove sessions
+- **Edit & delete sessions** – Adjust duration, add notes, or remove sessions (with confirmation)
 - **Overtime alerts** – On Fridays, prompts to leave early when weekly target is hit
 - **Idle detection** – Optional auto-pause when inactive, auto-resume on activity
 - **Export to CSV** – By Australian financial year (Jul 1–Jun 30), with Date, Location, Hours (2 decimals)
 - **Financial year exports** – Export individual FYs or all at once
-- **Tray icon** – Quick actions: Start (Home/Office), Quick log (Home/Office/Sick), Pause, Resume, Stop, Show, Settings, Quit
+- **Backup database** – Save a copy of the database for safekeeping
+- **Tray icon** – Quick actions: Start (Home/Office), Quick log (Home/Office/Sick), Pause, Resume, Stop, Show, Settings, Quit (macOS, Windows, Linux)
+- **Quit confirmation** – Prompts when quitting with a session in progress
+- **Theme** – Light, dark, or system preference
+- **Default tab** – Open on Timer or Quick log
 - **Sample data** – Load demo sessions across FY2023–2025 for testing
 
 ## Tech stack
@@ -27,6 +31,8 @@ A cross-platform menu bar application that tracks work hours and location (home/
 - **Node.js** 20+ or 22+
 - **Rust** – `rustup default stable`
 - Platform build tools (Xcode on macOS, Visual Studio on Windows)
+
+The tray icon and menu work on **macOS, Windows, and Linux**.
 
 ## Getting started
 

@@ -521,6 +521,22 @@ h1 {
   padding: 0.4em 0.6em;
 }
 
+.edit-modal-input.edit-modal-notes {
+  width: 100%;
+  min-width: 12em;
+}
+
+.edit-modal-delete-btn {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: white;
+}
+
+.edit-modal-delete-btn:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
 .edit-modal-error {
   color: #c62828;
   font-size: 0.9rem;
@@ -1086,4 +1102,14 @@ button.timer-btn:active {
   background: #1e293b;
   border-color: #475569;
   color: #f1f5f9;
+}
+
+[data-theme="dark"] .edit-modal-delete-btn {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+[data-theme="dark"] .edit-modal-delete-btn:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
 }

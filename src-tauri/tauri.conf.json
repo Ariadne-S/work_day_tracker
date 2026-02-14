@@ -14,7 +14,9 @@
       {
         "title": "Work Day Tracker",
         "width": 800,
-        "height": 600
+        "height": 600,
+        "minWidth": 360,
+        "minHeight": 400
       }
     ],
     "security": { "csp": null }

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import "./App.css";
 
@@ -110,6 +110,8 @@ function App() {
   const [logDayLocation, setLogDayLocation] = useState("home");
   const [logDayHours, setLogDayHours] = useState(8);
   const [editingSession, setEditingSession] = useState(null);
+  const [deleteConfirmSession, setDeleteConfirmSession] = useState(null);
+  const [quitConfirmModal, setQuitConfirmModal] = useState(false);
   const [overtimeModal, setOvertimeModal] = useState(null);
   const [leaveEarlyTarget, setLeaveEarlyTarget] = useState(null);
   const [hasShownOvertimeAlert, setHasShownOvertimeAlert] = useState(false);
@@ -156,9 +158,13 @@ function App() {
         setView(e.payload);
       }
     });
+    const unlistenQuit = listen("confirm-quit", () => {
+      setQuitConfirmModal(true);
+    });
     return () => {
       unlistenTimer.then((fn) => fn());
       unlistenNav.then((fn) => fn());
+      unlistenQuit.then((fn) => fn());
     };
   }, []);
 
@@ -309,8 +315,8 @@ function App() {
   function openEditModal(s) {
     const mins = s.duration_minutes ?? 0;
     setEditingSession({
-      id: s.id,
-      duration_minutes: mins,
+      ...s,
+      editNotes: s.notes ?? "",
       editHours: Math.floor(mins / 60),
       editMinutes: mins % 60,
     });
@@ -324,30 +330,56 @@ function App() {
       if (mins < 1 || mins > 24 * 60) {
         return;
       }
-      await invoke("update_session_duration", {
+      await invoke("update_session", {
         sessionId: editingSession.id,
         newDurationMinutes: mins,
+        notes: (editingSession.editNotes || "").trim() || null,
       });
       refreshAppData(setSessions, setWeeklySummary, setFinancialYears);
       setEditingSession(null);
     } catch (err) {
-      // Could show error in modal
       setEditingSession((prev) => (prev ? { ...prev, error: String(err) } : null));
     }
   }
 
-  async function handleDeleteSession(s) {
-    if (
-      !window.confirm(`Delete session for ${formatDate(s.date)}, ${s.location}, ${formatDuration(s.duration_minutes)}?`)
-    ) {
-      return;
-    }
+  function handleDeleteSession(s) {
+    setDeleteConfirmSession(s);
+  }
+
+  async function confirmDeleteSession() {
+    if (!deleteConfirmSession) return;
+    const s = deleteConfirmSession;
+    setDeleteConfirmSession(null);
     try {
       await invoke("delete_session", { sessionId: s.id });
       refreshAppData(setSessions, setWeeklySummary, setFinancialYears);
       showToast("Session deleted");
     } catch (err) {
       showToast(`Error: ${err}`, "error");
+    }
+  }
+
+  async function handleBackupDatabase() {
+    try {
+      const path = await save({
+        defaultPath: `work_day_tracker_backup_${format(new Date(), "yyyy-MM-dd")}.db`,
+        title: "Save database backup",
+      });
+      if (path) {
+        await invoke("backup_database", { destPath: path });
+        showToast("Database backed up");
+      }
+    } catch (err) {
+      showToast(`Backup failed: ${err}`, "error");
+    }
+  }
+
+  async function handleQuitConfirm() {
+    setQuitConfirmModal(false);
+    try {
+      await invoke("quit_app");
+    } catch {
+      /* ignore */
     }
   }
 
@@ -595,213 +627,280 @@ function App() {
       )}
 
       {view === "quicklog" && (
-            <section className="section log-day-section">
-              <p className="log-day-hint">Log a full work day without using the timer</p>
-              <form onSubmit={handleLogDay} className="log-day-form">
-                <div className="log-day-row">
-                  <label>
-                    Date
-                    <input
-                      type="date"
-                      value={logDayDate}
-                      onChange={(e) => setLogDayDate(e.target.value)}
-                      className="log-day-input"
-                    />
-                  </label>
-                  <label>
-                    Location
-                    <select
-                      value={logDayLocation}
-                      onChange={(e) => setLogDayLocation(e.target.value)}
-                      className="location-picker"
-                    >
-                      <option value="home">Home</option>
-                      <option value="office">Office</option>
-                      <option value="sick">Sick</option>
-                    </select>
-                  </label>
-                  {logDayLocation !== "sick" && (
-                    <label>
-                      Hours
-                      <input
-                        type="number"
-                        min="0.25"
-                        max="24"
-                        step="0.25"
-                        value={logDayHours}
-                        onChange={(e) => setLogDayHours(parseFloat(e.target.value) || 8)}
-                        className="log-day-hours"
-                      />
-                    </label>
-                  )}
-                </div>
-                <button type="submit" className="log-day-btn">
-                  {logDayLocation === "sick" ? "Log sick day" : "Log day"}
-                </button>
-              </form>
-            </section>
-          )}
-
-{view === "sessions" && (
-        <section className="section sessions-section">
-              <div className="sessions-header">
+        <section className="section log-day-section">
+          <p className="log-day-hint">Log a full work day without using the timer</p>
+          <form onSubmit={handleLogDay} className="log-day-form">
+            <div className="log-day-row">
+              <label>
+                Date
+                <input
+                  type="date"
+                  value={logDayDate}
+                  onChange={(e) => setLogDayDate(e.target.value)}
+                  className="log-day-input"
+                />
+              </label>
+              <label>
+                Location
                 <select
-                  value={sessionFilter}
-                  onChange={(e) => {
-                    setSessionFilter(e.target.value);
-                    setSessionsDisplayLimit(SESSION_DISPLAY_INCREMENT);
-                  }}
-                  className="session-filter"
+                  value={logDayLocation}
+                  onChange={(e) => setLogDayLocation(e.target.value)}
+                  className="location-picker"
                 >
-                  <option value="all">All</option>
-                  <option value="today">Today</option>
-                  <option value="week">This week</option>
-                  <option value="month">This month</option>
+                  <option value="home">Home</option>
+                  <option value="office">Office</option>
+                  <option value="sick">Sick</option>
                 </select>
-              </div>
-              <p className="sessions-hint">
-                {sessionFilter === "all"
-                  ? "All completed sessions, newest first"
-                  : `Filtered to ${sessionFilter === "today" ? "today" : sessionFilter === "week" ? "this week" : "this month"}`}
-              </p>
-              {sessions.length === 0 ? (
-                <p className="sessions-empty">No sessions yet.</p>
-              ) : (
-                (() => {
-                  const filtered = filterSessions(sessions, sessionFilter);
-                  if (filtered.length === 0) {
-                    return <p className="sessions-empty">No sessions in this period.</p>;
-                  }
-                  const displayed = filtered.slice(0, sessionsDisplayLimit);
-                  const hasMore = displayed.length < filtered.length;
-                  return (
-                    <>
-                      <ul className="sessions-list">
-                        {displayed.map((s) => (
-                          <li key={s.id} className="session-item">
-                            <span className="session-date">{formatDate(s.date)}</span>
-                            <span className="session-location">{s.location}</span>
-                            <span className="session-duration">{formatDuration(s.duration_minutes)}</span>
-                            <button
-                              type="button"
-                              className="session-edit-btn"
-                              onClick={() => openEditModal(s)}
-                              title="Edit duration"
-                              aria-label="Edit duration"
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              type="button"
-                              className="session-delete-btn"
-                              onClick={() => handleDeleteSession(s)}
-                              title="Delete session"
-                              aria-label="Delete session"
-                            >
-                              🗑️
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                      {hasMore && (
+              </label>
+              {logDayLocation !== "sick" && (
+                <label>
+                  Hours
+                  <input
+                    type="number"
+                    min="0.25"
+                    max="24"
+                    step="0.25"
+                    value={logDayHours}
+                    onChange={(e) => setLogDayHours(parseFloat(e.target.value) || 8)}
+                    className="log-day-hours"
+                  />
+                </label>
+              )}
+            </div>
+            <button type="submit" className="log-day-btn">
+              {logDayLocation === "sick" ? "Log sick day" : "Log day"}
+            </button>
+          </form>
+        </section>
+      )}
+
+      {view === "sessions" && (
+        <section className="section sessions-section">
+          <div className="sessions-header">
+            <select
+              value={sessionFilter}
+              onChange={(e) => {
+                setSessionFilter(e.target.value);
+                setSessionsDisplayLimit(SESSION_DISPLAY_INCREMENT);
+              }}
+              className="session-filter"
+            >
+              <option value="all">All</option>
+              <option value="today">Today</option>
+              <option value="week">This week</option>
+              <option value="month">This month</option>
+            </select>
+          </div>
+          <p className="sessions-hint">
+            {sessionFilter === "all"
+              ? "All completed sessions, newest first"
+              : `Filtered to ${sessionFilter === "today" ? "today" : sessionFilter === "week" ? "this week" : "this month"}`}
+          </p>
+          {sessions.length === 0 ? (
+            <p className="sessions-empty">No sessions yet.</p>
+          ) : (
+            (() => {
+              const filtered = filterSessions(sessions, sessionFilter);
+              if (filtered.length === 0) {
+                return <p className="sessions-empty">No sessions in this period.</p>;
+              }
+              const displayed = filtered.slice(0, sessionsDisplayLimit);
+              const hasMore = displayed.length < filtered.length;
+              return (
+                <>
+                  <ul className="sessions-list">
+                    {displayed.map((s) => (
+                      <li key={s.id} className="session-item">
+                        <span className="session-date">{formatDate(s.date)}</span>
+                        <span className="session-location">{s.location}</span>
+                        <span className="session-duration">{formatDuration(s.duration_minutes)}</span>
                         <button
                           type="button"
-                          className="show-more-btn"
-                          onClick={() => setSessionsDisplayLimit((n) => n + SESSION_DISPLAY_INCREMENT)}
+                          className="session-edit-btn"
+                          onClick={() => openEditModal(s)}
+                          title="Edit duration"
+                          aria-label="Edit duration"
                         >
-                          Show more ({filtered.length - displayed.length} remaining)
+                          ✏️
                         </button>
-                      )}
-                    </>
-                  );
-                })()
-              )}
-            </section>
-          )}
-          {overtimeModal && (
-            <div
-              className="edit-modal-overlay"
-              onClick={() => setOvertimeModal(null)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === "Escape" && setOvertimeModal(null)}
-              aria-label="Close modal"
-            >
-              <div className="edit-modal overtime-modal" onClick={(e) => e.stopPropagation()}>
-                <h3>Overtime this week</h3>
-                <p className="overtime-modal-text">
-                  You&apos;ve already hit your weekly target. You can leave{" "}
-                  {formatDuration(overtimeModal.surplus_minutes)} early if you&apos;d like.
-                </p>
-                <div className="edit-modal-actions">
-                  <button type="button" onClick={() => doStartSession(false)}>
-                    No, work normally
-                  </button>
-                  <button type="button" onClick={() => doStartSession(true)} className="overtime-yes-btn">
-                    Yes, leave early
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-          {editingSession && (
-            <div
-              className="edit-modal-overlay"
-              onClick={() => setEditingSession(null)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === "Escape" && setEditingSession(null)}
-              aria-label="Close modal"
-            >
-              <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
-                <h3>Edit duration</h3>
-                <p className="edit-modal-original">Original: {formatDuration(editingSession.duration_minutes)}</p>
-                <form onSubmit={handleUpdateDuration} className="edit-modal-form">
-                  <div className="edit-modal-row">
-                    <label>
-                      Hours
-                      <input
-                        type="number"
-                        min="0"
-                        max="24"
-                        value={editingSession.editHours}
-                        onChange={(e) =>
-                          setEditingSession((prev) => ({
-                            ...prev,
-                            editHours: Math.max(0, Math.min(24, parseInt(e.target.value, 10) || 0)),
-                          }))
-                        }
-                        className="edit-modal-input"
-                      />
-                    </label>
-                    <label>
-                      Minutes
-                      <input
-                        type="number"
-                        min="0"
-                        max="59"
-                        value={editingSession.editMinutes}
-                        onChange={(e) =>
-                          setEditingSession((prev) => ({
-                            ...prev,
-                            editMinutes: Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0)),
-                          }))
-                        }
-                        className="edit-modal-input"
-                      />
-                    </label>
-                  </div>
-                  {editingSession.error && <p className="edit-modal-error">{editingSession.error}</p>}
-                  <div className="edit-modal-actions">
-                    <button type="button" onClick={() => setEditingSession(null)}>
-                      Cancel
+                        <button
+                          type="button"
+                          className="session-delete-btn"
+                          onClick={() => handleDeleteSession(s)}
+                          title="Delete session"
+                          aria-label="Delete session"
+                        >
+                          🗑️
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {hasMore && (
+                    <button
+                      type="button"
+                      className="show-more-btn"
+                      onClick={() => setSessionsDisplayLimit((n) => n + SESSION_DISPLAY_INCREMENT)}
+                    >
+                      Show more ({filtered.length - displayed.length} remaining)
                     </button>
-                    <button type="submit">Save</button>
-                  </div>
-                </form>
-              </div>
-            </div>
+                  )}
+                </>
+              );
+            })()
           )}
+        </section>
+      )}
+
+      {overtimeModal && (
+        <div
+          className="edit-modal-overlay"
+          onClick={() => setOvertimeModal(null)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === "Escape" && setOvertimeModal(null)}
+          aria-label="Close modal"
+        >
+          <div className="edit-modal overtime-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Overtime this week</h3>
+            <p className="overtime-modal-text">
+              You&apos;ve already hit your weekly target. You can leave {formatDuration(overtimeModal.surplus_minutes)}{" "}
+              early if you&apos;d like.
+            </p>
+            <div className="edit-modal-actions">
+              <button type="button" onClick={() => doStartSession(false)}>
+                No, work normally
+              </button>
+              <button type="button" onClick={() => doStartSession(true)} className="overtime-yes-btn">
+                Yes, leave early
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingSession && (
+        <div
+          className="edit-modal-overlay"
+          onClick={() => setEditingSession(null)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === "Escape" && setEditingSession(null)}
+          aria-label="Close modal"
+        >
+          <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Edit duration</h3>
+            <p className="edit-modal-original">Original: {formatDuration(editingSession.duration_minutes)}</p>
+            <form onSubmit={handleUpdateDuration} className="edit-modal-form">
+              <div className="edit-modal-row">
+                <label>
+                  Hours
+                  <input
+                    type="number"
+                    min="0"
+                    max="24"
+                    value={editingSession.editHours}
+                    onChange={(e) =>
+                      setEditingSession((prev) => ({
+                        ...prev,
+                        editHours: Math.max(0, Math.min(24, parseInt(e.target.value, 10) || 0)),
+                      }))
+                    }
+                    className="edit-modal-input"
+                  />
+                </label>
+                <label>
+                  Minutes
+                  <input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={editingSession.editMinutes}
+                    onChange={(e) =>
+                      setEditingSession((prev) => ({
+                        ...prev,
+                        editMinutes: Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0)),
+                      }))
+                    }
+                    className="edit-modal-input"
+                  />
+                </label>
+              </div>
+              <div className="edit-modal-row">
+                <label>
+                  Notes
+                  <input
+                    type="text"
+                    value={editingSession.editNotes ?? ""}
+                    onChange={(e) => setEditingSession((prev) => ({ ...prev, editNotes: e.target.value }))}
+                    className="edit-modal-input edit-modal-notes"
+                    placeholder="Optional"
+                  />
+                </label>
+              </div>
+              {editingSession.error && <p className="edit-modal-error">{editingSession.error}</p>}
+              <div className="edit-modal-actions">
+                <button type="button" onClick={() => setEditingSession(null)}>
+                  Cancel
+                </button>
+                <button type="submit">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirmSession && (
+        <div
+          className="edit-modal-overlay"
+          onClick={() => setDeleteConfirmSession(null)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === "Escape" && setDeleteConfirmSession(null)}
+          aria-label="Close modal"
+        >
+          <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Delete session</h3>
+            <p className="edit-modal-original">
+              Delete session for {formatDate(deleteConfirmSession.date)}, {deleteConfirmSession.location},{" "}
+              {formatDuration(deleteConfirmSession.duration_minutes)}?
+            </p>
+            <div className="edit-modal-actions">
+              <button type="button" onClick={() => setDeleteConfirmSession(null)}>
+                Cancel
+              </button>
+              <button type="button" className="edit-modal-delete-btn" onClick={confirmDeleteSession}>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {quitConfirmModal && (
+        <div
+          className="edit-modal-overlay"
+          onClick={() => setQuitConfirmModal(false)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === "Escape" && setQuitConfirmModal(false)}
+          aria-label="Close modal"
+        >
+          <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Session in progress</h3>
+            <p className="overtime-modal-text">
+              You have a session running or paused. Quitting will lose the current session time. Quit anyway?
+            </p>
+            <div className="edit-modal-actions">
+              <button type="button" onClick={() => setQuitConfirmModal(false)}>
+                Cancel
+              </button>
+              <button type="button" onClick={handleQuitConfirm} className="overtime-yes-btn">
+                Quit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {view === "export" && (
         <section className="section export-view">
@@ -809,6 +908,9 @@ function App() {
           <div className="export-actions">
             <button type="button" onClick={handleExport} className="export-btn">
               {exportStatus || "Export all FYs to folder"}
+            </button>
+            <button type="button" onClick={handleBackupDatabase} className="export-fy-btn">
+              Backup database
             </button>
           </div>
           <h3 className="export-subhead">By financial year</h3>
