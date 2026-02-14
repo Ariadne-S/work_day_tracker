@@ -46,3 +46,13 @@ pub fn resume_session() -> Result<(), String> {
 pub fn get_sessions() -> Result<Vec<db::SessionRow>, String> {
     db::get_sessions_impl()
 }
+
+#[tauri::command]
+pub fn get_settings() -> Result<db::Settings, String> {
+    db::get_settings_impl()
+}
+
+#[tauri::command]
+pub fn save_setting(key: String, value: String) -> Result<(), String> {
+    db::save_setting_impl(&key, &value)
+}

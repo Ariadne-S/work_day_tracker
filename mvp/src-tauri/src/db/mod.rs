@@ -40,6 +40,8 @@ pub fn init_at(path: &Path) -> Result<()> {
         INSERT OR IGNORE INTO settings (key, value) VALUES ('active_session_id', '');
         INSERT OR IGNORE INTO settings (key, value) VALUES ('active_session_elapsed', '0');
         INSERT OR IGNORE INTO settings (key, value) VALUES ('active_session_paused', '0');
+        INSERT OR IGNORE INTO settings (key, value) VALUES ('expected_hours_per_week', '40');
+        INSERT OR IGNORE INTO settings (key, value) VALUES ('default_location', 'home');
         ",
     )?;
     let mut guard = DB_PATH.lock().unwrap();
@@ -217,4 +219,41 @@ pub fn get_sessions_impl() -> Result<Vec<SessionRow>, String> {
         .map_err(|e| e.to_string())?;
     let sessions: Result<Vec<_>, _> = rows.collect();
     sessions.map_err(|e| e.to_string())
+}
+
+const USER_SETTING_KEYS: &[&str] = &["expected_hours_per_week", "default_location"];
+
+#[derive(serde::Serialize)]
+pub struct Settings {
+    pub expected_hours_per_week: u32,
+    pub default_location: String,
+}
+
+/// Get user-facing settings (excludes internal keys like active_session_*).
+pub fn get_settings_impl() -> Result<Settings, String> {
+    let expected: u32 = get_setting("expected_hours_per_week")
+        .unwrap_or_else(|_| "40".to_string())
+        .parse()
+        .unwrap_or(40);
+    let default_location = get_setting("default_location").unwrap_or_else(|_| "home".to_string());
+    let default_location = if default_location == "office" {
+        "office".to_string()
+    } else {
+        "home".to_string()
+    };
+    Ok(Settings {
+        expected_hours_per_week: expected,
+        default_location,
+    })
+}
+
+/// Save a user setting. Only whitelisted keys are allowed.
+pub fn save_setting_impl(key: &str, value: &str) -> Result<(), String> {
+    if !USER_SETTING_KEYS.contains(&key) {
+        return Err(format!("invalid setting key: {}", key));
+    }
+    if key == "default_location" && value != "home" && value != "office" {
+        return Err("default_location must be 'home' or 'office'".to_string());
+    }
+    set_setting(key, value).map_err(|e| e.to_string())
 }

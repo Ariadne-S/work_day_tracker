@@ -1,7 +1,7 @@
 mod commands;
 mod db;
 
-use commands::{get_sessions, get_timer_state, pause_session, ping, resume_session, start_session, stop_session};
+use commands::{get_sessions, get_settings, get_timer_state, pause_session, ping, resume_session, save_setting, start_session, stop_session};
 
 #[cfg(test)]
 mod tests {
@@ -97,6 +97,29 @@ mod tests {
 
     #[test]
     #[serial]
+    fn test_get_settings_returns_defaults() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let db_path = dir.path().join("test.db");
+        db::init_at(&db_path).expect("db init failed");
+        let settings = db::get_settings_impl().expect("get_settings failed");
+        assert_eq!(settings.expected_hours_per_week, 40);
+    }
+
+    #[test]
+    #[serial]
+    fn test_save_setting_persists() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let db_path = dir.path().join("test.db");
+        db::init_at(&db_path).expect("db init failed");
+        db::save_setting_impl("expected_hours_per_week", "35").expect("save_setting failed");
+        db::save_setting_impl("default_location", "office").expect("save_setting failed");
+        let settings = db::get_settings_impl().expect("get_settings failed");
+        assert_eq!(settings.expected_hours_per_week, 35);
+        assert_eq!(settings.default_location, "office");
+    }
+
+    #[test]
+    #[serial]
     fn test_resume_session_then_running() {
         let dir = tempfile::tempdir().expect("temp dir");
         let db_path = dir.path().join("test.db");
@@ -117,7 +140,7 @@ pub fn run() {
             db::init(app.handle()).expect("failed to init db");
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![ping, get_timer_state, start_session, stop_session, pause_session, resume_session, get_sessions])
+        .invoke_handler(tauri::generate_handler![ping, get_timer_state, start_session, stop_session, pause_session, resume_session, get_sessions, get_settings, save_setting])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
