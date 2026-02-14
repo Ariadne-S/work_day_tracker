@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { format } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -39,6 +39,44 @@ function refreshSessions(setSessions) {
     .catch(() => setSessions([]));
 }
 
+function refreshAppData(setSessions, setWeeklySummary, setFinancialYears) {
+  refreshSessions(setSessions);
+  invoke("get_weekly_summary").then((s) => setWeeklySummary(s)).catch(() => setWeeklySummary(null));
+  invoke("get_financial_years_with_data").then((fys) => setFinancialYears(fys)).catch(() => setFinancialYears([]));
+}
+
+async function saveCsvToFolder(csv, filename, title = "Choose folder to save") {
+  const dir = await open({ directory: true, title });
+  if (!dir) return false;
+  const sep = dir.includes("\\") ? "\\" : "/";
+  await writeTextFile(`${dir}${sep}${filename}`, csv);
+  return true;
+}
+
+const SESSION_DISPLAY_INCREMENT = 15;
+
+function filterSessions(sessions, filter) {
+  if (!sessions.length || filter === "all") return sessions;
+  const now = new Date();
+  const todayStr = format(now, "yyyy-MM-dd");
+  return sessions.filter((s) => {
+    if (!s.date) return false;
+    if (filter === "today") return s.date === todayStr;
+    const d = new Date(s.date + "T12:00:00");
+    if (filter === "week") {
+      const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+      const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+      return isWithinInterval(d, { start: weekStart, end: weekEnd });
+    }
+    if (filter === "month") {
+      const monthStart = startOfMonth(now);
+      const monthEnd = endOfMonth(now);
+      return isWithinInterval(d, { start: monthStart, end: monthEnd });
+    }
+    return true;
+  });
+}
+
 function App() {
   const [timerState, setTimerState] = useState({ status: "", elapsed_seconds: 0 });
   const [location, setLocation] = useState("home");
@@ -50,6 +88,9 @@ function App() {
   const [financialYears, setFinancialYears] = useState([]);
   const [fyExportStatus, setFyExportStatus] = useState({});
   const [sampleDataStatus, setSampleDataStatus] = useState("");
+  const [view, setView] = useState("tracker");
+  const [sessionFilter, setSessionFilter] = useState("all");
+  const [sessionsDisplayLimit, setSessionsDisplayLimit] = useState(SESSION_DISPLAY_INCREMENT);
 
   useEffect(() => {
     refreshState(setTimerState);
@@ -69,9 +110,7 @@ function App() {
 
     const unlisten = listen("timer-state-changed", () => {
       refreshState(setTimerState);
-      refreshSessions(setSessions);
-      invoke("get_weekly_summary").then((s) => setWeeklySummary(s)).catch(() => {});
-      invoke("get_financial_years_with_data").then((fys) => setFinancialYears(fys)).catch(() => {});
+      refreshAppData(setSessions, setWeeklySummary, setFinancialYears);
     });
     return () => {
       unlisten.then((fn) => fn());
@@ -131,13 +170,8 @@ function App() {
     try {
       const csv = await invoke("get_export_csv_for_fy", { fy });
       if (!csv) return;
-      const dir = await open({
-        directory: true,
-        title: `Choose folder to save FY${fy} export`,
-      });
-      if (dir) {
-        const sep = dir.includes("\\") ? "\\" : "/";
-        await writeTextFile(`${dir}${sep}work-hours-FY${fy}.csv`, csv);
+      const saved = await saveCsvToFolder(csv, `work-hours-FY${fy}.csv`, `Choose folder to save FY${fy} export`);
+      if (saved) {
         setFyExportStatus((s) => ({ ...s, [fy]: "Saved" }));
         setTimeout(() => setFyExportStatus((s) => ({ ...s, [fy]: "" })), 2000);
       }
@@ -150,9 +184,7 @@ function App() {
   async function handleLoadSampleData() {
     try {
       const count = await invoke("seed_sample_data");
-      refreshSessions(setSessions);
-      invoke("get_financial_years_with_data").then((fys) => setFinancialYears(fys)).catch(() => {});
-      invoke("get_weekly_summary").then((s) => setWeeklySummary(s)).catch(() => {});
+      refreshAppData(setSessions, setWeeklySummary, setFinancialYears);
       setSampleDataStatus(count > 0 ? `Loaded ${count} sample sessions` : "Already have data");
       setTimeout(() => setSampleDataStatus(""), 2000);
     } catch (e) {
@@ -169,10 +201,7 @@ function App() {
         setTimeout(() => setExportStatus(""), 2000);
         return;
       }
-      const dir = await open({
-        directory: true,
-        title: "Choose folder to save export files",
-      });
+      const dir = await open({ directory: true, title: "Choose folder to save export files" });
       if (dir) {
         const sep = dir.includes("\\") ? "\\" : "/";
         for (const [fy, csv] of byFy) {
@@ -210,8 +239,33 @@ function App() {
   return (
     <main className="container">
       <h1>Work Day Tracker</h1>
-      <p className="subtitle">Slice 10: Export CSV</p>
 
+      <nav className="app-nav">
+        <button
+          type="button"
+          className={"nav-link" + (view === "tracker" ? " active" : "")}
+          onClick={() => setView("tracker")}
+        >
+          Tracker
+        </button>
+        <button
+          type="button"
+          className={"nav-link" + (view === "export" ? " active" : "")}
+          onClick={() => setView("export")}
+        >
+          Export
+        </button>
+        <button
+          type="button"
+          className={"nav-link" + (view === "settings" ? " active" : "")}
+          onClick={() => setView("settings")}
+        >
+          Settings
+        </button>
+      </nav>
+
+      {view === "tracker" && (
+        <>
       <div className="timer-display">
         <span className="timer-time" data-testid="timer-display">
           {formatElapsed(timerState.elapsed_seconds)}
@@ -260,7 +314,7 @@ function App() {
       </div>
 
       {weeklySummary && (
-        <section className="summary-section">
+        <section className="section summary-section">
           <h2>This week</h2>
           <div className="summary-grid">
             <span className="summary-label">Today</span>
@@ -285,30 +339,73 @@ function App() {
         </section>
       )}
 
-      <section className="sessions-section">
+      <section className="section sessions-section">
         <div className="sessions-header">
           <h2>Sessions</h2>
-          <button type="button" onClick={handleExport} className="export-btn">
-            {exportStatus || "Export CSV"}
-          </button>
+          <select
+            value={sessionFilter}
+            onChange={(e) => {
+              setSessionFilter(e.target.value);
+              setSessionsDisplayLimit(SESSION_DISPLAY_INCREMENT);
+            }}
+            className="session-filter"
+          >
+            <option value="all">All</option>
+            <option value="today">Today</option>
+            <option value="week">This week</option>
+            <option value="month">This month</option>
+          </select>
         </div>
+        <p className="sessions-hint">
+          {sessionFilter === "all"
+            ? "All completed sessions, newest first"
+            : `Filtered to ${sessionFilter === "today" ? "today" : sessionFilter === "week" ? "this week" : "this month"}`}
+        </p>
         {sessions.length === 0 ? (
           <p className="sessions-empty">No sessions yet.</p>
-        ) : (
-          <ul className="sessions-list">
-            {sessions.map((s) => (
-              <li key={s.id} className="session-item">
-                <span className="session-date">{formatDate(s.date)}</span>
-                <span className="session-location">{s.location}</span>
-                <span className="session-duration">{formatDuration(s.duration_minutes)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
+        ) : (() => {
+          const filtered = filterSessions(sessions, sessionFilter);
+          if (filtered.length === 0) {
+            return <p className="sessions-empty">No sessions in this period.</p>;
+          }
+          const displayed = filtered.slice(0, sessionsDisplayLimit);
+          const hasMore = displayed.length < filtered.length;
+          return (
+            <>
+              <ul className="sessions-list">
+                {displayed.map((s) => (
+                  <li key={s.id} className="session-item">
+                    <span className="session-date">{formatDate(s.date)}</span>
+                    <span className="session-location">{s.location}</span>
+                    <span className="session-duration">{formatDuration(s.duration_minutes)}</span>
+                  </li>
+                ))}
+              </ul>
+              {hasMore && (
+                <button
+                  type="button"
+                  className="show-more-btn"
+                  onClick={() => setSessionsDisplayLimit((n) => n + SESSION_DISPLAY_INCREMENT)}
+                >
+                  Show more ({filtered.length - displayed.length} remaining)
+                </button>
+              )}
+            </>
+          );
+        })()}
       </section>
+        </>
+      )}
 
-      <section className="fy-section">
-        <h2>Financial year exports</h2>
+      {view === "export" && (
+        <section className="section export-view">
+        <h2>Export</h2>
+        <div className="export-actions">
+          <button type="button" onClick={handleExport} className="export-btn">
+            {exportStatus || "Export all FYs to folder"}
+          </button>
+        </div>
+        <h3 className="export-subhead">By financial year</h3>
         {financialYears.length === 0 ? (
           <p className="fy-empty">
             No financial year data yet.{" "}
@@ -339,9 +436,11 @@ function App() {
             </ul>
           </>
         )}
-      </section>
+        </section>
+      )}
 
-      <section className="settings-section">
+      {view === "settings" && (
+      <section className="section settings-section">
         <h2>Settings</h2>
         <form onSubmit={handleSaveSettings} className="settings-form">
           <label>
@@ -377,6 +476,7 @@ function App() {
           </button>
         </form>
       </section>
+      )}
     </main>
   );
 }

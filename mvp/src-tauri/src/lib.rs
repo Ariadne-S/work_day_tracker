@@ -8,7 +8,7 @@ pub fn run_seed(path: &std::path::Path, force: bool) -> Result<u32, String> {
     db::seed_sample_data_impl(force)
 }
 
-use commands::{get_export_csv, get_export_csv_by_fy, get_export_csv_for_fy, get_financial_years_with_data, get_sessions, get_settings, get_timer_state, get_weekly_summary, pause_session, ping, resume_session, save_setting, seed_sample_data, start_session, stop_session};
+use commands::{get_export_csv_by_fy, get_export_csv_for_fy, get_financial_years_with_data, get_sessions, get_settings, get_timer_state, get_weekly_summary, pause_session, ping, resume_session, save_setting, seed_sample_data, start_session, stop_session};
 use tauri::{Emitter, Manager};
 
 #[cfg(test)]
@@ -156,7 +156,7 @@ mod tests {
 
     #[test]
     #[serial]
-    fn test_get_export_csv_daily_hours() {
+    fn test_get_export_csv_format_and_content() {
         let dir = tempfile::tempdir().expect("temp dir");
         let db_path = dir.path().join("test.db");
         db::init_at(&db_path).expect("db init failed");
@@ -164,13 +164,12 @@ mod tests {
         db::stop_session_impl(90 * 60).expect("stop failed"); // 90 min = 1.5 hours
         db::start_session_impl("office").expect("start failed");
         db::stop_session_impl(120 * 60).expect("stop failed"); // 120 min = 2 hours on same day
-        let csv = get_export_csv().expect("get_export_csv failed");
+        let by_fy = get_export_csv_by_fy().expect("get_export_csv_by_fy failed");
+        assert!(!by_fy.is_empty());
+        let csv = &by_fy[0].1;
         assert!(csv.starts_with("Date,Location,Hours\n"));
-        assert!(csv.contains("202"));
-        // Same date, two locations: home 1.5h, office 2h → two rows
         let lines: Vec<&str> = csv.lines().collect();
         assert_eq!(lines.len(), 3);
-        assert_eq!(lines[0], "Date,Location,Hours");
         let home_row: Vec<&str> = lines[1].split(',').collect();
         let office_row: Vec<&str> = lines[2].split(',').collect();
         assert_eq!(home_row[1], "home");
@@ -325,7 +324,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![ping, get_timer_state, start_session, stop_session, pause_session, resume_session, get_sessions, get_settings, save_setting, get_weekly_summary, get_export_csv, get_export_csv_by_fy, get_export_csv_for_fy, get_financial_years_with_data, seed_sample_data])
+        .invoke_handler(tauri::generate_handler![ping, get_timer_state, start_session, stop_session, pause_session, resume_session, get_sessions, get_settings, save_setting, get_weekly_summary, get_export_csv_by_fy, get_export_csv_for_fy, get_financial_years_with_data, seed_sample_data])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 window.hide().unwrap();

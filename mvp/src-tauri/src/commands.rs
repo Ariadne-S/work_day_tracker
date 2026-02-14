@@ -62,18 +62,6 @@ pub fn get_weekly_summary() -> Result<db::WeeklySummary, String> {
     db::get_weekly_summary_impl()
 }
 
-/// Returns CSV content for export: Date,Location,Hours (one row per date+location, decimal hours).
-#[tauri::command]
-pub fn get_export_csv() -> Result<String, String> {
-    let rows = db::get_daily_hours_for_export_impl()?;
-    let mut lines = vec!["Date,Location,Hours".to_string()];
-    for (date, location, minutes) in rows {
-        let hours = (minutes as f64) / 60.0;
-        lines.push(format!("{},{},{:.2}", date, location, hours));
-    }
-    Ok(lines.join("\n"))
-}
-
 /// Returns one CSV per Australian financial year: Vec of (fy, csv_content). One file per year.
 #[tauri::command]
 pub fn get_export_csv_by_fy() -> Result<Vec<(u32, String)>, String> {
