@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { open } from "@tauri-apps/plugin-dialog";
+import { writeTextFile } from "@tauri-apps/plugin-fs";
 import "./App.css";
 
 function formatElapsed(seconds) {
@@ -44,6 +46,10 @@ function App() {
   const [settings, setSettings] = useState({ expected_hours_per_week: 40, default_location: "home" });
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [weeklySummary, setWeeklySummary] = useState(null);
+  const [exportStatus, setExportStatus] = useState("");
+  const [financialYears, setFinancialYears] = useState([]);
+  const [fyExportStatus, setFyExportStatus] = useState({});
+  const [sampleDataStatus, setSampleDataStatus] = useState("");
 
   useEffect(() => {
     refreshState(setTimerState);
@@ -57,11 +63,15 @@ function App() {
         setLocation(s.default_location || "home");
       })
       .catch(() => { });
+    invoke("get_financial_years_with_data")
+      .then((fys) => setFinancialYears(fys))
+      .catch(() => setFinancialYears([]));
 
     const unlisten = listen("timer-state-changed", () => {
       refreshState(setTimerState);
       refreshSessions(setSessions);
       invoke("get_weekly_summary").then((s) => setWeeklySummary(s)).catch(() => {});
+      invoke("get_financial_years_with_data").then((fys) => setFinancialYears(fys)).catch(() => {});
     });
     return () => {
       unlisten.then((fn) => fn());
@@ -112,6 +122,71 @@ function App() {
     }
   }
 
+  function getCurrentFY() {
+    const now = new Date();
+    return now.getMonth() >= 6 ? now.getFullYear() + 1 : now.getFullYear();
+  }
+
+  async function handleExportFy(fy) {
+    try {
+      const csv = await invoke("get_export_csv_for_fy", { fy });
+      if (!csv) return;
+      const dir = await open({
+        directory: true,
+        title: `Choose folder to save FY${fy} export`,
+      });
+      if (dir) {
+        const sep = dir.includes("\\") ? "\\" : "/";
+        await writeTextFile(`${dir}${sep}work-hours-FY${fy}.csv`, csv);
+        setFyExportStatus((s) => ({ ...s, [fy]: "Saved" }));
+        setTimeout(() => setFyExportStatus((s) => ({ ...s, [fy]: "" })), 2000);
+      }
+    } catch (e) {
+      setFyExportStatus((s) => ({ ...s, [fy]: `Error: ${e}` }));
+      setTimeout(() => setFyExportStatus((s) => ({ ...s, [fy]: "" })), 3000);
+    }
+  }
+
+  async function handleLoadSampleData() {
+    try {
+      const count = await invoke("seed_sample_data");
+      refreshSessions(setSessions);
+      invoke("get_financial_years_with_data").then((fys) => setFinancialYears(fys)).catch(() => {});
+      invoke("get_weekly_summary").then((s) => setWeeklySummary(s)).catch(() => {});
+      setSampleDataStatus(count > 0 ? `Loaded ${count} sample sessions` : "Already have data");
+      setTimeout(() => setSampleDataStatus(""), 2000);
+    } catch (e) {
+      setSampleDataStatus(`Error: ${e}`);
+      setTimeout(() => setSampleDataStatus(""), 3000);
+    }
+  }
+
+  async function handleExport() {
+    try {
+      const byFy = await invoke("get_export_csv_by_fy");
+      if (byFy.length === 0) {
+        setExportStatus("No data to export");
+        setTimeout(() => setExportStatus(""), 2000);
+        return;
+      }
+      const dir = await open({
+        directory: true,
+        title: "Choose folder to save export files",
+      });
+      if (dir) {
+        const sep = dir.includes("\\") ? "\\" : "/";
+        for (const [fy, csv] of byFy) {
+          await writeTextFile(`${dir}${sep}work-hours-FY${fy}.csv`, csv);
+        }
+        setExportStatus(`Exported ${byFy.length} file(s)`);
+        setTimeout(() => setExportStatus(""), 2000);
+      }
+    } catch (e) {
+      setExportStatus(`Error: ${e}`);
+      setTimeout(() => setExportStatus(""), 3000);
+    }
+  }
+
   async function handleSaveSettings(e) {
     e.preventDefault();
     try {
@@ -135,7 +210,7 @@ function App() {
   return (
     <main className="container">
       <h1>Work Day Tracker</h1>
-      <p className="subtitle">Slice 8: Weekly summary</p>
+      <p className="subtitle">Slice 10: Export CSV</p>
 
       <div className="timer-display">
         <span className="timer-time" data-testid="timer-display">
@@ -211,7 +286,12 @@ function App() {
       )}
 
       <section className="sessions-section">
-        <h2>Sessions</h2>
+        <div className="sessions-header">
+          <h2>Sessions</h2>
+          <button type="button" onClick={handleExport} className="export-btn">
+            {exportStatus || "Export CSV"}
+          </button>
+        </div>
         {sessions.length === 0 ? (
           <p className="sessions-empty">No sessions yet.</p>
         ) : (
@@ -224,6 +304,40 @@ function App() {
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section className="fy-section">
+        <h2>Financial year exports</h2>
+        {financialYears.length === 0 ? (
+          <p className="fy-empty">
+            No financial year data yet.{" "}
+            <button type="button" onClick={handleLoadSampleData} className="link-btn">
+              Load sample data
+            </button>
+            {" "}to see previous years.
+            {sampleDataStatus && <span className="fy-status"> {sampleDataStatus}</span>}
+          </p>
+        ) : (
+          <>
+            <ul className="fy-list">
+              {financialYears.map((fy) => (
+                <li key={fy} className="fy-item">
+                  <span className="fy-label">
+                    FY {fy}
+                    {fy === getCurrentFY() && " (current)"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleExportFy(fy)}
+                    className="export-fy-btn"
+                  >
+                    {fyExportStatus[fy] || "Export"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </section>
 

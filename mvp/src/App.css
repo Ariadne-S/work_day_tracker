@@ -143,9 +143,32 @@
   margin-right: auto;
 }
 
+.sessions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75em;
+  flex-wrap: wrap;
+  gap: 0.5em;
+}
+
 .sessions-section h2 {
   font-size: 1.1rem;
-  margin-bottom: 0.75em;
+  margin: 0;
+}
+
+.export-btn {
+  padding: 0.4em 0.8em;
+  border-radius: 8px;
+  border: 1px solid #24c8db;
+  background: #24c8db;
+  color: #0f0f0f;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.export-btn:hover {
+  background: #1eb5c9;
 }
 
 .sessions-empty {
@@ -180,6 +203,81 @@
 .session-duration {
   font-family: "SF Mono", Monaco, monospace;
   font-size: 0.9em;
+}
+
+.fy-section {
+  margin-top: 2em;
+  text-align: left;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.fy-section h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.75em;
+}
+
+.fy-empty {
+  color: #666;
+  font-style: italic;
+}
+
+.fy-status {
+  font-style: normal;
+  color: #24c8db;
+}
+
+.fy-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75em 0;
+}
+
+.fy-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5em 0.75em;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.04);
+  margin-bottom: 0.5em;
+}
+
+.fy-label {
+  font-weight: 500;
+}
+
+.export-fy-btn {
+  padding: 0.3em 0.6em;
+  border-radius: 6px;
+  border: 1px solid #24c8db;
+  background: #fff;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.export-fy-btn:hover {
+  background: #e8f9fb;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: #24c8db;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0;
+}
+
+.link-btn:hover {
+  color: #1eb5c9;
+}
+
+.link-btn.secondary {
+  font-size: 0.9rem;
+  margin-top: 0.5em;
 }
 
 .settings-section {

@@ -300,3 +300,127 @@ pub fn get_weekly_summary_impl() -> Result<WeeklySummary, String> {
         difference_minutes,
     })
 }
+
+/// Daily totals for export: (date, location) -> total minutes.
+/// Only completed sessions; one row per (date, location); ordered by date, location.
+pub fn get_daily_hours_for_export_impl() -> Result<Vec<(String, String, u32)>, String> {
+    let conn = get_connection().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT date, location, SUM(duration_minutes) AS total
+             FROM sessions WHERE end_time IS NOT NULL AND duration_minutes IS NOT NULL
+             GROUP BY date, location ORDER BY date ASC, location ASC",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |row| {
+            let date: String = row.get(0)?;
+            let location: String = row.get(1)?;
+            let total: i64 = row.get(2)?;
+            Ok((date, location, total.max(0) as u32))
+        })
+        .map_err(|e| e.to_string())?;
+    let rows: Result<Vec<_>, _> = rows.collect();
+    rows.map_err(|e| e.to_string())
+}
+
+/// Australian financial year: July 1 - June 30. FY 2025 = 1 Jul 2024 to 30 Jun 2025.
+pub(crate) fn australian_fy_from_date(date_str: &str) -> Option<u32> {
+    let parts: Vec<&str> = date_str.split('-').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    let year: u32 = parts[0].parse().ok()?;
+    let month: u32 = parts[1].parse().ok()?;
+    let fy = if month >= 7 { year + 1 } else { year };
+    Some(fy)
+}
+
+/// Export data grouped by Australian financial year. Returns (fy, csv_content) per year.
+pub fn get_export_csv_by_fy_impl() -> Result<Vec<(u32, String)>, String> {
+    let rows = get_daily_hours_for_export_impl()?;
+    let mut by_fy: std::collections::BTreeMap<u32, Vec<(String, String, u32)>> =
+        std::collections::BTreeMap::new();
+    for (date, location, minutes) in rows {
+        if let Some(fy) = australian_fy_from_date(&date) {
+            by_fy.entry(fy).or_default().push((date, location, minutes));
+        }
+    }
+    let mut result = Vec::new();
+    for (fy, days) in by_fy {
+        let mut lines = vec!["Date,Location,Hours".to_string()];
+        for (date, location, minutes) in days {
+            let hours = (minutes as f64) / 60.0;
+            lines.push(format!("{},{},{:.2}", date, location, hours));
+        }
+        result.push((fy, lines.join("\n")));
+    }
+    Ok(result)
+}
+
+/// Returns FYs that have completed session data, sorted descending (newest first).
+pub fn get_financial_years_with_data_impl() -> Result<Vec<u32>, String> {
+    let rows = get_daily_hours_for_export_impl()?;
+    let mut fys: std::collections::BTreeSet<u32> = std::collections::BTreeSet::new();
+    for (date, _, _) in rows {
+        if let Some(fy) = australian_fy_from_date(&date) {
+            fys.insert(fy);
+        }
+    }
+    Ok(fys.into_iter().rev().collect())
+}
+
+/// Returns CSV for a single financial year, or empty string if no data.
+pub fn get_export_csv_for_fy_impl(fy: u32) -> Result<String, String> {
+    let by_fy = get_export_csv_by_fy_impl()?;
+    Ok(by_fy
+        .into_iter()
+        .find(|(f, _)| *f == fy)
+        .map(|(_, csv)| csv)
+        .unwrap_or_default())
+}
+
+/// Seed sample sessions across FY2023, FY2024, FY2025 for testing/demo.
+/// No-op if sessions already exist, unless `force` is true (clears then seeds).
+pub fn seed_sample_data_impl(force: bool) -> Result<u32, String> {
+    let conn = get_connection().map_err(|e| e.to_string())?;
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+    if count > 0 && !force {
+        return Ok(0);
+    }
+    if force && count > 0 {
+        conn.execute("DELETE FROM sessions", [])
+            .map_err(|e| e.to_string())?;
+    }
+    let sample = [
+        // FY2023 (Jul 2022 - Jun 2023)
+        ("2022-08-15", "home", 360),
+        ("2022-08-15", "office", 240),
+        ("2022-09-01", "office", 480),
+        ("2023-02-10", "home", 420),
+        ("2023-05-20", "office", 510),
+        // FY2024 (Jul 2023 - Jun 2024)
+        ("2023-07-03", "home", 300),
+        ("2023-08-22", "office", 480),
+        ("2023-11-15", "home", 360),
+        ("2024-01-08", "office", 420),
+        ("2024-04-02", "home", 390),
+        // FY2025 (Jul 2024 - Jun 2025)
+        ("2024-07-01", "office", 480),
+        ("2024-09-16", "home", 360),
+        ("2024-12-02", "office", 450),
+        ("2025-02-10", "home", 420),
+    ];
+    for (date, location, mins) in sample {
+        let start = format!("{} 09:00:00", date);
+        let end = format!("{} 17:00:00", date);
+        conn.execute(
+            "INSERT INTO sessions (date, start_time, end_time, duration_minutes, location) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![date, start, end, mins, location],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(sample.len() as u32)
+}

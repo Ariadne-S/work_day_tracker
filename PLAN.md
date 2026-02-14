@@ -171,11 +171,13 @@ Each slice: **Backend → Unit test → Frontend → Manual validation** before 
 
 ---
 
-### Slice 10: `export_csv`
+### Slice 10: `export_csv` ✓
 **Goal:** Export to CSV.
 
-- Backend command + unit tests
-- Frontend: Export modal with save dialog
+- Backend: `get_export_csv_by_fy` groups by Australian financial year (Jul 1–Jun 30), one CSV per FY
+- Frontend: Export button, directory picker, writes `work-hours-FY2025.csv` etc
+- fs:scope `$HOME/**` for write permissions
+- Tests: `test_australian_fy_from_date`, `test_get_export_csv_by_fy_australian_financial_year`
 
 **Validation:** CSV exports correctly; tests pass.
 

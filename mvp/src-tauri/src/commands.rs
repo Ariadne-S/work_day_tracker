@@ -61,3 +61,40 @@ pub fn save_setting(key: String, value: String) -> Result<(), String> {
 pub fn get_weekly_summary() -> Result<db::WeeklySummary, String> {
     db::get_weekly_summary_impl()
 }
+
+/// Returns CSV content for export: Date,Location,Hours (one row per date+location, decimal hours).
+#[tauri::command]
+pub fn get_export_csv() -> Result<String, String> {
+    let rows = db::get_daily_hours_for_export_impl()?;
+    let mut lines = vec!["Date,Location,Hours".to_string()];
+    for (date, location, minutes) in rows {
+        let hours = (minutes as f64) / 60.0;
+        lines.push(format!("{},{},{:.2}", date, location, hours));
+    }
+    Ok(lines.join("\n"))
+}
+
+/// Returns one CSV per Australian financial year: Vec of (fy, csv_content). One file per year.
+#[tauri::command]
+pub fn get_export_csv_by_fy() -> Result<Vec<(u32, String)>, String> {
+    db::get_export_csv_by_fy_impl()
+}
+
+/// Returns list of financial years that have data (newest first).
+#[tauri::command]
+pub fn get_financial_years_with_data() -> Result<Vec<u32>, String> {
+    db::get_financial_years_with_data_impl()
+}
+
+/// Returns CSV for a single FY, or empty string if no data.
+#[tauri::command]
+pub fn get_export_csv_for_fy(fy: u32) -> Result<String, String> {
+    db::get_export_csv_for_fy_impl(fy)
+}
+
+/// Inserts sample sessions across FY2023–2025 for demo.
+/// Pass force: true to clear existing sessions and re-seed.
+#[tauri::command]
+pub fn seed_sample_data(force: Option<bool>) -> Result<u32, String> {
+    db::seed_sample_data_impl(force.unwrap_or(false))
+}
