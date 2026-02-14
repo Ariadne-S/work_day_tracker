@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Work Day Tracker",
   "version": "0.1.0",
-  "identifier": "com.workdaytracker.mvp",
+  "identifier": "com.workdaytracker.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",

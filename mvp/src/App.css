@@ -1,54 +1,67 @@
 :root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  font-family: "DM Sans", system-ui, -apple-system, sans-serif;
   font-size: 16px;
-  line-height: 24px;
+  line-height: 1.5;
   font-weight: 400;
 
-  color: #0f0f0f;
-  background-color: #f6f6f6;
+  color: #1a1a1a;
+  background-color: #f8fafb;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
+
+  --accent: #0ea5b7;
+  --accent-hover: #0d96a6;
+  --accent-muted: rgba(14, 165, 183, 0.12);
+  --border: #e2e8f0;
+  --muted: #64748b;
+  --surface: #ffffff;
+  --surface-elevated: rgba(255, 255, 255, 0.9);
 }
 
 .container {
   margin: 0;
-  padding: 1.5em 1em 2em;
+  padding: 2rem 1.5rem 2.5rem;
   display: flex;
   flex-direction: column;
   justify-content: center;
   text-align: center;
+  min-height: 100vh;
 }
 
 .app-nav {
   display: flex;
   justify-content: center;
-  gap: 0.25em;
-  margin: 0.75em 0 1.25em 0;
+  gap: 0.5rem;
+  margin: 1rem 0 1.5rem 0;
 }
 
 .nav-link {
-  padding: 0.5em 1em;
-  border-radius: 8px;
+  padding: 0.6rem 1.5rem;
+  border-radius: 10px;
+  font-size: 1rem;
   background: transparent;
   border: 1px solid transparent;
   font-size: 0.95rem;
-  color: #666;
+  font-weight: 500;
+  color: var(--muted);
   cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
 
 .nav-link:hover {
-  color: #0f0f0f;
-  border-color: #ccc;
+  color: #1a1a1a;
+  border-color: var(--border);
+  background: var(--surface);
 }
 
 .nav-link.active {
-  background: #24c8db;
-  color: #0f0f0f;
-  border-color: #24c8db;
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
 }
 
 .subtitle {
@@ -60,21 +73,29 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5em;
-  margin: 1em 0;
+  gap: 0.5rem;
+  margin: 1.5rem 0;
+  padding: 1.5rem;
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--border);
 }
 
 .timer-time {
   font-family: "SF Mono", "Monaco", "Consolas", monospace;
-  font-size: 3rem;
+  font-size: 3.25rem;
   font-weight: 600;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
+  color: #0f172a;
 }
 
 .timer-status {
-  font-size: 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 500;
   text-transform: uppercase;
-  color: #666;
+  letter-spacing: 0.1em;
+  color: var(--muted);
 }
 
 .location-row {
@@ -90,11 +111,18 @@
 }
 
 .location-picker {
-  padding: 0.4em 0.8em;
-  border-radius: 8px;
-  border: 1px solid #ccc;
-  font-size: 1em;
-  background-color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-size: 1rem;
+  background: var(--surface);
+  transition: border-color 0.15s;
+}
+
+.location-picker:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-muted);
 }
 
 .location-picker:disabled {
@@ -157,41 +185,122 @@
 
 .log-day-btn {
   align-self: flex-start;
-  padding: 0.5em 1em;
-  border-radius: 6px;
-  border: 1px solid #24c8db;
-  background: #fff;
-  color: #0f0f0f;
-  font-size: 0.9rem;
+  padding: 0.6rem 1.25rem;
+  border-radius: 10px;
+  border: none;
+  background: var(--accent);
+  color: white;
+  font-size: 0.95rem;
+  font-weight: 500;
   cursor: pointer;
+  transition: background 0.15s;
 }
 
 .log-day-btn:hover {
-  background: #e8f9fb;
+  background: var(--accent-hover);
 }
 
 .section {
-  margin-top: 1.5em;
+  margin-top: 2rem;
   text-align: left;
-  max-width: 400px;
+  max-width: 420px;
   margin-left: auto;
   margin-right: auto;
 }
 
+h1 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 0.25rem;
+  text-align: center;
+}
+
+.section-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.section-toggle h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.collapse-icon {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.section-count {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.collapsible-section {
+  margin-top: 1rem;
+}
+
+.collapsible-section .section-toggle {
+  padding: 0.25rem 0;
+}
+
+.summary-toggle {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.summary-toggle:hover {
+  border-color: var(--accent);
+  background: var(--accent-muted);
+}
+
+.summary-inline {
+  font-weight: 500;
+}
+
+.summary-diff-inline {
+  font-weight: 500;
+}
+
+.summary-compact .summary-grid {
+  margin-top: 0.75rem;
+}
+
 .summary-section h2 {
   font-size: 1.1rem;
-  margin-bottom: 0.75em;
+  margin-bottom: 1rem;
 }
 
 .summary-grid {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 0.5em 1.5em;
+  gap: 0.5rem 1.5rem;
   align-items: center;
+  padding: 1.25rem;
+  background: var(--surface);
+  border-radius: 12px;
+  border: 1px solid var(--border);
 }
 
 .summary-label {
-  color: #666;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .summary-value {
@@ -231,33 +340,37 @@
 .show-more-btn {
   display: block;
   width: 100%;
-  margin-top: 0.75em;
-  padding: 0.5em;
-  border-radius: 6px;
-  border: 1px dashed #999;
+  margin-top: 1rem;
+  padding: 0.6rem;
+  border-radius: 10px;
+  border: 2px dashed var(--border);
   background: transparent;
   font-size: 0.9rem;
-  color: #666;
+  font-weight: 500;
+  color: var(--muted);
   cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
 }
 
 .show-more-btn:hover {
-  border-color: #24c8db;
-  color: #24c8db;
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .export-btn {
-  padding: 0.4em 0.8em;
-  border-radius: 8px;
-  border: 1px solid #24c8db;
-  background: #24c8db;
-  color: #0f0f0f;
-  font-size: 0.9rem;
+  padding: 0.6rem 1.25rem;
+  border-radius: 10px;
+  border: none;
+  background: var(--accent);
+  color: white;
+  font-size: 0.95rem;
+  font-weight: 500;
   cursor: pointer;
+  transition: background 0.15s;
 }
 
 .export-btn:hover {
-  background: #1eb5c9;
+  background: var(--accent-hover);
 }
 
 .sessions-hint {
@@ -280,12 +393,14 @@
 .session-item {
   display: grid;
   grid-template-columns: 1fr 5rem 5.5rem auto auto;
-  gap: 1em;
-  padding: 0.5em 0.75em;
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.04);
-  margin-bottom: 0.5em;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  margin-bottom: 0.5rem;
   align-items: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .session-date {
@@ -305,28 +420,38 @@
 }
 
 .session-edit-btn {
-  padding: 0.25em 0.4em;
+  padding: 0.4rem 0.6rem;
   background: transparent;
   border: 1px solid transparent;
   cursor: pointer;
-  font-size: 1rem;
-  opacity: 0.6;
+  font-size: 1.1rem;
+  opacity: 0.7;
   min-width: auto;
   box-shadow: none;
 }
 
-.session-edit-btn:hover,
+.session-edit-btn:hover {
+  opacity: 1;
+  transform: scale(1.08);
+}
+
 .session-delete-btn:hover {
   opacity: 1;
+  transform: scale(1.08);
+}
+
+.session-edit-btn,
+.session-delete-btn {
+  transition: opacity 0.15s, transform 0.15s;
 }
 
 .session-delete-btn {
-  padding: 0.25em 0.4em;
+  padding: 0.4rem 0.6rem;
   background: transparent;
   border: 1px solid transparent;
   cursor: pointer;
-  font-size: 1rem;
-  opacity: 0.6;
+  font-size: 1.1rem;
+  opacity: 0.7;
   min-width: auto;
   box-shadow: none;
 }
@@ -342,11 +467,12 @@
 }
 
 .edit-modal {
-  background: var(--background-color, #f6f6f6);
-  padding: 1.5em;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  min-width: 280px;
+  background: var(--surface);
+  padding: 1.5rem;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--border);
+  min-width: 300px;
 }
 
 .edit-modal h3 {
@@ -401,8 +527,9 @@
 }
 
 .overtime-yes-btn {
-  background: #24c8db;
-  border-color: #24c8db;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
 }
 
 .settings-checkbox-label {
@@ -418,8 +545,43 @@
 
 .settings-hint {
   font-size: 0.8rem;
-  color: #666;
+  color: var(--muted);
   margin-top: 0.25em;
+}
+
+.toast {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.75rem 1.5rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: toast-in 0.25s ease-out;
+  z-index: 1000;
+}
+
+.toast-success {
+  background: #0f172a;
+  color: white;
+}
+
+.toast-error {
+  background: #dc2626;
+  color: white;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .fy-section {
@@ -466,10 +628,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5em 0.75em;
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.04);
-  margin-bottom: 0.5em;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  margin-bottom: 0.5rem;
 }
 
 .fy-label {
@@ -477,16 +640,20 @@
 }
 
 .export-fy-btn {
-  padding: 0.3em 0.6em;
-  border-radius: 6px;
-  border: 1px solid #24c8db;
-  background: #fff;
-  font-size: 0.85rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  border: 1px solid var(--accent);
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 500;
   cursor: pointer;
+  transition: background 0.15s, color 0.15s;
 }
 
 .export-fy-btn:hover {
-  background: #e8f9fb;
+  background: var(--accent-muted);
 }
 
 .link-btn {
@@ -566,17 +733,16 @@
 }
 
 .settings-save {
-  padding: 0.6em 1.5em;
+  padding: 0.6rem 1.5rem;
   font-size: 1rem;
   align-self: flex-start;
-  background: #24c8db;
-  border-color: #24c8db;
-  color: #0f0f0f;
+  background: var(--accent);
+  border: none;
+  color: white;
 }
 
 .settings-save:hover {
-  background: #1eb5c9;
-  border-color: #1eb5c9;
+  background: var(--accent-hover);
 }
 
 a {
@@ -586,19 +752,15 @@ a {
 }
 
 a:hover {
-  color: #535bf2;
-}
-
-h1 {
-  text-align: center;
+  color: var(--accent);
 }
 
 input,
 button {
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
+  padding: 0.65rem 1.25rem;
+  font-size: 1rem;
   font-weight: 500;
   font-family: inherit;
   color: #0f0f0f;
@@ -611,12 +773,8 @@ button {
   cursor: pointer;
 }
 
-button:hover {
-  border-color: #396cd8;
-}
-button:active {
-  border-color: #396cd8;
-  background-color: #e8e8e8;
+button:not(.timer-btn):hover {
+  border-color: var(--accent);
 }
 
 input,
@@ -625,29 +783,50 @@ button {
 }
 
 button.timer-btn {
-  padding: 1em 2em;
+  padding: 1rem 2rem;
   font-size: 1.15rem;
-  min-width: 6.5rem;
+  font-weight: 500;
+  min-width: 7rem;
+  border-radius: 12px;
+  transition: background 0.15s, transform 0.1s;
+}
+
+button.timer-btn:hover {
+  transform: translateY(-1px);
+}
+
+button.timer-btn:active {
+  transform: translateY(0);
 }
 
 @media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #22d3d8;
+    --accent-hover: #2dd4d8;
+    --accent-muted: rgba(34, 211, 216, 0.15);
+    --border: #334155;
+    --muted: #94a3b8;
+    --surface: #1e293b;
+    --surface-elevated: #334155;
+  }
+
   .nav-link {
-    color: #aaa;
+    color: var(--muted);
   }
 
   .nav-link:hover {
-    color: #f6f6f6;
-    border-color: #555;
+    color: #f8fafc;
+    border-color: var(--border);
   }
 
   .nav-link.active {
-    background: #24c8db;
-    color: #0f0f0f;
+    background: var(--accent);
+    color: #0f172a;
   }
 
   :root {
-    color: #f6f6f6;
-    background-color: #2f2f2f;
+    color: #f8fafc;
+    background-color: #0f172a;
   }
 
   .subtitle {
@@ -674,13 +853,12 @@ button.timer-btn {
   }
 
   .log-day-btn {
-    border-color: #24c8db;
-    background: transparent;
-    color: #24c8db;
+    background: var(--accent);
+    color: #0f172a;
   }
 
   .log-day-btn:hover {
-    background: rgba(36, 200, 219, 0.15);
+    background: var(--accent-hover);
   }
 
   .session-filter {
@@ -695,12 +873,13 @@ button.timer-btn {
   }
 
   .show-more-btn:hover {
-    border-color: #24c8db;
-    color: #24c8db;
+    border-color: var(--accent);
+    color: var(--accent);
   }
 
   .session-item {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--surface);
+    border-color: var(--border);
   }
 
   .summary-label {

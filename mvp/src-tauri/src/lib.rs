@@ -318,8 +318,12 @@ pub fn run() {
                 .expect("failed to create tray menu");
 
             let handle = app.handle().clone();
+            let tray_icon = include_bytes!("../icons/32x32.png");
+            let icon = tauri::image::Image::from_bytes(tray_icon)
+                .ok()
+                .or_else(|| app.default_window_icon().cloned());
             let _tray = tauri::tray::TrayIconBuilder::with_id("main")
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(icon.unwrap_or_else(|| app.default_window_icon().unwrap().clone()))
                 .tooltip("Work Day Tracker")
                 .menu(&menu)
                 .show_menu_on_left_click(false)

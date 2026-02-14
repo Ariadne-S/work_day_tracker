@@ -11,7 +11,7 @@ fn app_data_dir() -> PathBuf {
     let base = std::env::var("APPDATA").unwrap_or_else(|_| format!("{}\\AppData\\Roaming", home));
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     let base = format!("{}/.local/share", home);
-    PathBuf::from(base).join("com.workdaytracker.mvp")
+    PathBuf::from(base).join("com.workdaytracker.app")
 }
 
 fn main() {
@@ -20,7 +20,7 @@ fn main() {
     std::fs::create_dir_all(&app_data).expect("failed to create app data dir");
     let db_path = app_data.join("work_day_tracker.db");
 
-    let count = mvp_lib::run_seed(&db_path, force).expect("seed failed");
+    let count = work_day_tracker::run_seed(&db_path, force).expect("seed failed");
     if force && count > 0 {
         println!("Cleared and reseeded {} sessions to {:?}", count, db_path);
     } else {

@@ -94,11 +94,19 @@ function App() {
   const [logDayDate, setLogDayDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [logDayLocation, setLogDayLocation] = useState("home");
   const [logDayHours, setLogDayHours] = useState(8);
-  const [logDayStatus, setLogDayStatus] = useState("");
   const [editingSession, setEditingSession] = useState(null);
   const [overtimeModal, setOvertimeModal] = useState(null);
   const [leaveEarlyTarget, setLeaveEarlyTarget] = useState(null);
   const [hasShownOvertimeAlert, setHasShownOvertimeAlert] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [quickLogOpen, setQuickLogOpen] = useState(false);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
+
+  function showToast(message, type = "success") {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), type === "error" ? 4000 : 2500);
+  }
 
   useEffect(() => {
     refreshState(setTimerState);
@@ -310,8 +318,9 @@ function App() {
     try {
       await invoke("delete_session", { sessionId: s.id });
       refreshAppData(setSessions, setWeeklySummary, setFinancialYears);
+      showToast("Session deleted");
     } catch (err) {
-      alert(`Error: ${err}`);
+      showToast(`Error: ${err}`, "error");
     }
   }
 
@@ -320,7 +329,7 @@ function App() {
     try {
       const mins = Math.round(logDayHours * 60);
       if (mins < 1 || mins > 24 * 60) {
-        setLogDayStatus("Hours must be between 0.01 and 24");
+        showToast("Hours must be between 0.01 and 24", "error");
         return;
       }
       await invoke("log_full_day", {
@@ -329,11 +338,9 @@ function App() {
         durationMinutes: mins,
       });
       refreshAppData(setSessions, setWeeklySummary, setFinancialYears);
-      setLogDayStatus("Logged");
-      setTimeout(() => setLogDayStatus(""), 2000);
+      showToast("Day logged");
     } catch (err) {
-      setLogDayStatus(`Error: ${err}`);
-      setTimeout(() => setLogDayStatus(""), 3000);
+      showToast(`Error: ${err}`, "error");
     }
   }
 
@@ -448,79 +455,121 @@ function App() {
         )}
       </div>
 
-      <section className="section log-day-section">
-        <h2>Quick log</h2>
-        <p className="log-day-hint">Log a full work day without using the timer</p>
-        <form onSubmit={handleLogDay} className="log-day-form">
-          <div className="log-day-row">
-            <label>
-              Date
-              <input
-                type="date"
-                value={logDayDate}
-                onChange={(e) => setLogDayDate(e.target.value)}
-                className="log-day-input"
-              />
-            </label>
-            <label>
-              Location
-              <select
-                value={logDayLocation}
-                onChange={(e) => setLogDayLocation(e.target.value)}
-                className="location-picker"
-              >
-                <option value="home">Home</option>
-                <option value="office">Office</option>
-              </select>
-            </label>
-            <label>
-              Hours
-              <input
-                type="number"
-                min="0.25"
-                max="24"
-                step="0.25"
-                value={logDayHours}
-                onChange={(e) => setLogDayHours(parseFloat(e.target.value) || 8)}
-                className="log-day-hours"
-              />
-            </label>
-          </div>
-          <button type="submit" className="log-day-btn">
-            {logDayStatus || "Log day"}
-          </button>
-        </form>
-      </section>
-
       {weeklySummary && (
-        <section className="section summary-section">
-          <h2>This week</h2>
-          <div className="summary-grid">
-            <span className="summary-label">Today</span>
-            <span className="summary-value">{format(new Date(), "EEE dd MMM yyyy")}</span>
-            <span className="summary-label">Week of</span>
-            <span className="summary-value">{formatDate(weeklySummary.week_start)}</span>
-            <span className="summary-label">Actual</span>
-            <span className="summary-value">{formatDuration(weeklySummary.actual_minutes)}</span>
-            <span className="summary-label">Expected</span>
-            <span className="summary-value">{formatDuration(weeklySummary.expected_minutes)}</span>
-            <span className="summary-label">Difference</span>
-            <span
-              className={
-                "summary-value summary-diff " +
-                (weeklySummary.difference_minutes >= 0 ? "summary-over" : "summary-under")
-              }
-            >
-              {weeklySummary.difference_minutes >= 0 ? "+" : ""}
-              {formatDuration(Math.abs(weeklySummary.difference_minutes))}
+        <section className="section summary-section summary-compact">
+          <button
+            type="button"
+            className="summary-toggle"
+            onClick={() => setSummaryExpanded(!summaryExpanded)}
+            aria-expanded={summaryExpanded}
+          >
+            <span className="summary-inline">
+              This week: {formatDuration(weeklySummary.actual_minutes)} / {formatDuration(weeklySummary.expected_minutes)}
+              <span
+                className={
+                  "summary-diff-inline " +
+                  (weeklySummary.difference_minutes >= 0 ? "summary-over" : "summary-under")
+                }
+              >
+                {" "}({weeklySummary.difference_minutes >= 0 ? "+" : ""}{formatDuration(Math.abs(weeklySummary.difference_minutes))})
+              </span>
             </span>
-          </div>
+            <span className="collapse-icon">{summaryExpanded ? "▴" : "▾"}</span>
+          </button>
+          {summaryExpanded && (
+            <div className="summary-grid">
+              <span className="summary-label">Today</span>
+              <span className="summary-value">{format(new Date(), "EEE dd MMM yyyy")}</span>
+              <span className="summary-label">Week of</span>
+              <span className="summary-value">{formatDate(weeklySummary.week_start)}</span>
+              <span className="summary-label">Actual</span>
+              <span className="summary-value">{formatDuration(weeklySummary.actual_minutes)}</span>
+              <span className="summary-label">Expected</span>
+              <span className="summary-value">{formatDuration(weeklySummary.expected_minutes)}</span>
+              <span className="summary-label">Difference</span>
+              <span
+                className={
+                  "summary-value summary-diff " +
+                  (weeklySummary.difference_minutes >= 0 ? "summary-over" : "summary-under")
+                }
+              >
+                {weeklySummary.difference_minutes >= 0 ? "+" : ""}
+                {formatDuration(Math.abs(weeklySummary.difference_minutes))}
+              </span>
+            </div>
+          )}
         </section>
       )}
 
-      <section className="section sessions-section">
+      <section className="section log-day-section collapsible-section">
+        <button
+          type="button"
+          className="section-toggle"
+          onClick={() => setQuickLogOpen(!quickLogOpen)}
+          aria-expanded={quickLogOpen}
+        >
+          <h2>Quick log</h2>
+          <span className="collapse-icon">{quickLogOpen ? "▴" : "▾"}</span>
+        </button>
+        {quickLogOpen && (
+          <>
+            <p className="log-day-hint">Log a full work day without using the timer</p>
+            <form onSubmit={handleLogDay} className="log-day-form">
+              <div className="log-day-row">
+                <label>
+                  Date
+                  <input
+                    type="date"
+                    value={logDayDate}
+                    onChange={(e) => setLogDayDate(e.target.value)}
+                    className="log-day-input"
+                  />
+                </label>
+                <label>
+                  Location
+                  <select
+                    value={logDayLocation}
+                    onChange={(e) => setLogDayLocation(e.target.value)}
+                    className="location-picker"
+                  >
+                    <option value="home">Home</option>
+                    <option value="office">Office</option>
+                  </select>
+                </label>
+                <label>
+                  Hours
+                  <input
+                    type="number"
+                    min="0.25"
+                    max="24"
+                    step="0.25"
+                    value={logDayHours}
+                    onChange={(e) => setLogDayHours(parseFloat(e.target.value) || 8)}
+                    className="log-day-hours"
+                  />
+                </label>
+              </div>
+              <button type="submit" className="log-day-btn">
+                Log day
+              </button>
+            </form>
+          </>
+        )}
+      </section>
+
+      <section className="section sessions-section collapsible-section">
+        <button
+          type="button"
+          className="section-toggle"
+          onClick={() => setSessionsOpen(!sessionsOpen)}
+          aria-expanded={sessionsOpen}
+        >
+          <h2>Sessions {sessions.length > 0 && <span className="section-count">({sessions.length})</span>}</h2>
+          <span className="collapse-icon">{sessionsOpen ? "▴" : "▾"}</span>
+        </button>
+        {sessionsOpen && (
+        <>
         <div className="sessions-header">
-          <h2>Sessions</h2>
           <select
             value={sessionFilter}
             onChange={(e) => {
@@ -590,6 +639,9 @@ function App() {
             </>
           );
         })()}
+        </>
+        )}
+      </section>
       {overtimeModal && (
         <div
           className="edit-modal-overlay"
@@ -680,7 +732,6 @@ function App() {
           </div>
         </div>
       )}
-      </section>
         </>
       )}
 
@@ -804,6 +855,16 @@ function App() {
           </button>
         </form>
       </section>
+      )}
+
+      {toast && (
+        <div
+          className={"toast toast-" + toast.type}
+          role="status"
+          aria-live="polite"
+        >
+          {toast.message}
+        </div>
       )}
     </main>
   );
