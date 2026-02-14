@@ -41,3 +41,8 @@ pub fn pause_session() -> Result<(), String> {
 pub fn resume_session() -> Result<(), String> {
     db::resume_session_impl()
 }
+
+#[tauri::command]
+pub fn get_sessions() -> Result<Vec<db::SessionRow>, String> {
+    db::get_sessions_impl()
+}

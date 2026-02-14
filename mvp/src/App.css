@@ -99,6 +99,53 @@
   flex-wrap: wrap;
 }
 
+.sessions-section {
+  margin-top: 3em;
+  text-align: left;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.sessions-section h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.75em;
+}
+
+.sessions-empty {
+  color: #666;
+  font-style: italic;
+}
+
+.sessions-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.session-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 1em;
+  padding: 0.5em 0.75em;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.04);
+  margin-bottom: 0.5em;
+}
+
+.session-date {
+  font-weight: 500;
+}
+
+.session-location {
+  text-transform: capitalize;
+}
+
+.session-duration {
+  font-family: "SF Mono", Monaco, monospace;
+  font-size: 0.9em;
+}
+
 a {
   font-weight: 500;
   color: #646cff;
@@ -166,6 +213,14 @@ button {
     border-color: #555;
     background-color: #1a1a1a;
     color: #f6f6f6;
+  }
+
+  .sessions-empty {
+    color: #888;
+  }
+
+  .session-item {
+    background: rgba(255, 255, 255, 0.06);
   }
 
   a:hover {

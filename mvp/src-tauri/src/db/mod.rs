@@ -182,3 +182,39 @@ pub fn get_timer_state_inner() -> Result<(String, u64)> {
 
     Ok((status, elapsed))
 }
+
+#[derive(serde::Serialize)]
+pub struct SessionRow {
+    pub id: i64,
+    pub date: String,
+    pub start_time: String,
+    pub end_time: Option<String>,
+    pub duration_minutes: Option<i32>,
+    pub location: String,
+}
+
+/// List completed sessions (with end_time), newest first.
+pub fn get_sessions_impl() -> Result<Vec<SessionRow>, String> {
+    let conn = get_connection().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, date, start_time, end_time, duration_minutes, location
+             FROM sessions WHERE end_time IS NOT NULL
+             ORDER BY date DESC, start_time DESC",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(SessionRow {
+                id: row.get(0)?,
+                date: row.get(1)?,
+                start_time: row.get(2)?,
+                end_time: row.get(3)?,
+                duration_minutes: row.get(4)?,
+                location: row.get(5)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+    let sessions: Result<Vec<_>, _> = rows.collect();
+    sessions.map_err(|e| e.to_string())
+}

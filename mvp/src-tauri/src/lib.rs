@@ -1,7 +1,7 @@
 mod commands;
 mod db;
 
-use commands::{get_timer_state, pause_session, ping, resume_session, start_session, stop_session};
+use commands::{get_sessions, get_timer_state, pause_session, ping, resume_session, start_session, stop_session};
 
 #[cfg(test)]
 mod tests {
@@ -83,6 +83,20 @@ mod tests {
 
     #[test]
     #[serial]
+    fn test_get_sessions_returns_completed() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let db_path = dir.path().join("test.db");
+        db::init_at(&db_path).expect("db init failed");
+        db::start_session_impl("home").expect("start_session failed");
+        db::stop_session_impl(60).expect("stop_session failed");
+        let sessions = db::get_sessions_impl().expect("get_sessions failed");
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].location, "home");
+        assert_eq!(sessions[0].duration_minutes, Some(1));
+    }
+
+    #[test]
+    #[serial]
     fn test_resume_session_then_running() {
         let dir = tempfile::tempdir().expect("temp dir");
         let db_path = dir.path().join("test.db");
@@ -103,7 +117,7 @@ pub fn run() {
             db::init(app.handle()).expect("failed to init db");
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![ping, get_timer_state, start_session, stop_session, pause_session, resume_session])
+        .invoke_handler(tauri::generate_handler![ping, get_timer_state, start_session, stop_session, pause_session, resume_session, get_sessions])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
