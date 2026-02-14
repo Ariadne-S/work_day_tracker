@@ -822,151 +822,218 @@ button.timer-btn:active {
   transform: translateY(0);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --accent: #22d3d8;
-    --accent-hover: #2dd4d8;
-    --accent-muted: rgba(34, 211, 216, 0.15);
-    --border: #334155;
-    --muted: #94a3b8;
-    --surface: #1e293b;
-    --surface-elevated: #334155;
-  }
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
 
-  .nav-link {
-    color: var(--muted);
-  }
+.app-header h1 {
+  margin: 0;
+}
 
-  .nav-link:hover {
-    color: #f8fafc;
-    border-color: var(--border);
-  }
+.theme-toggle {
+  display: flex;
+  gap: 0.25rem;
+}
 
-  .nav-link.active {
-    background: var(--accent);
-    color: #0f172a;
-  }
+.theme-btn {
+  padding: 0.35rem 0.5rem;
+  font-size: 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
+}
 
-  :root {
-    color: #f8fafc;
-    background-color: #0f172a;
-  }
+.theme-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
 
-  .subtitle {
-    color: #aaa;
-  }
+.theme-btn.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
 
-  .timer-status {
-    color: #aaa;
-  }
+.tracker-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin: 1rem 0;
+  justify-content: center;
+}
 
-  .location-picker {
-    border-color: #555;
-    background-color: #1a1a1a;
-    color: #f6f6f6;
-  }
+.tab-link {
+  padding: 0.5rem 1.25rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
+}
 
-  .sessions-hint,
-  .sessions-empty {
-    color: #888;
-  }
+.tab-link:hover {
+  color: #1a1a1a;
+  border-color: var(--border);
+  background: var(--surface);
+}
 
-  .log-day-hint {
-    color: #888;
-  }
+.tab-link.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
 
-  .log-day-btn {
-    background: var(--accent);
-    color: #0f172a;
-  }
+.theme-options {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.25rem;
+}
 
-  .log-day-btn:hover {
-    background: var(--accent-hover);
-  }
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-weight: normal;
+}
 
-  .session-filter {
-    border-color: #555;
-    background-color: #1a1a1a;
-    color: #f6f6f6;
-  }
+/* Dark theme – applied when data-theme="dark" (user choice or system preference) */
+[data-theme="dark"] {
+  --accent: #22d3d8;
+  --accent-hover: #2dd4d8;
+  --accent-muted: rgba(34, 211, 216, 0.15);
+  --border: #334155;
+  --muted: #94a3b8;
+  --surface: #1e293b;
+  --surface-elevated: #334155;
+  color: #f8fafc;
+  background-color: #0f172a;
+}
 
-  .show-more-btn {
-    border-color: #666;
-    color: #aaa;
-  }
+[data-theme="dark"] .nav-link {
+  color: var(--muted);
+}
 
-  .show-more-btn:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-  }
+[data-theme="dark"] .nav-link:hover {
+  color: #f8fafc;
+  border-color: var(--border);
+}
 
-  .session-item {
-    background: var(--surface);
-    border-color: var(--border);
-  }
+[data-theme="dark"] .nav-link.active {
+  background: var(--accent);
+  color: #0f172a;
+}
 
-  .summary-label {
-    color: #888;
-  }
+[data-theme="dark"] .subtitle,
+[data-theme="dark"] .timer-status {
+  color: #aaa;
+}
 
-  .summary-diff.summary-over {
-    color: #4caf50;
-  }
+[data-theme="dark"] .location-picker {
+  border-color: #555;
+  background-color: #1a1a1a;
+  color: #f6f6f6;
+}
 
-  .summary-diff.summary-under {
-    color: #f44336;
-  }
+[data-theme="dark"] .sessions-hint,
+[data-theme="dark"] .sessions-empty,
+[data-theme="dark"] .log-day-hint,
+[data-theme="dark"] .summary-label,
+[data-theme="dark"] .edit-modal-original,
+[data-theme="dark"] .settings-hint {
+  color: #888;
+}
 
-  .edit-modal {
-    background: #2f2f2f;
-  }
+[data-theme="dark"] .log-day-btn {
+  background: var(--accent);
+  color: #0f172a;
+}
 
-  .settings-form {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.12);
-  }
+[data-theme="dark"] .log-day-btn:hover {
+  background: var(--accent-hover);
+}
 
-  .settings-form .settings-field label {
-    color: #ddd;
-  }
+[data-theme="dark"] .session-filter {
+  border-color: #555;
+  background-color: #1a1a1a;
+  color: #f6f6f6;
+}
 
-  .settings-form .settings-input {
-    background: #1a1a1a;
-    border-color: #555;
-    color: #f6f6f6;
-  }
+[data-theme="dark"] .show-more-btn {
+  border-color: #666;
+  color: #aaa;
+}
 
-  .settings-form .location-picker {
-    background: #1a1a1a;
-    border-color: #555;
-  }
+[data-theme="dark"] .show-more-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 
-  .settings-hint {
-    color: #888;
-  }
+[data-theme="dark"] .session-item {
+  background: var(--surface);
+  border-color: var(--border);
+}
 
-  .edit-modal-original {
-    color: #888;
-  }
+[data-theme="dark"] .summary-diff.summary-over {
+  color: #4caf50;
+}
 
-  .edit-modal-error {
-    color: #f44336;
-  }
+[data-theme="dark"] .summary-diff.summary-under {
+  color: #f44336;
+}
 
-  .overtime-modal-text {
-    color: #ddd;
-  }
+[data-theme="dark"] .edit-modal {
+  background: #2f2f2f;
+}
 
-  a:hover {
-    color: #24c8db;
-  }
+[data-theme="dark"] .settings-form {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
 
-  input,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
-  }
-  button:active {
-    background-color: #0f0f0f69;
-  }
+[data-theme="dark"] .settings-form .settings-field label {
+  color: #ddd;
+}
+
+[data-theme="dark"] .settings-form .settings-input,
+[data-theme="dark"] .settings-form .location-picker {
+  background: #1a1a1a;
+  border-color: #555;
+  color: #f6f6f6;
+}
+
+[data-theme="dark"] .edit-modal-error {
+  color: #f44336;
+}
+
+[data-theme="dark"] .overtime-modal-text {
+  color: #ddd;
+}
+
+[data-theme="dark"] a:hover {
+  color: #24c8db;
+}
+
+[data-theme="dark"] .tab-link:hover {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .theme-btn.active {
+  background: var(--accent);
+  color: #0f172a;
 }

@@ -305,7 +305,9 @@ pub fn run() {
                 .text("start_home", "Start (Home)")
                 .text("start_office", "Start (Office)")
                 .separator()
-                .text("quick_log", "Quick log (defaults)")
+                .text("quick_log_home", "Quick log (Home)")
+                .text("quick_log_office", "Quick log (Office)")
+                .text("quick_log_sick", "Quick log (Sick)")
                 .separator()
                 .text("pause", "Pause")
                 .text("resume", "Resume")
@@ -351,8 +353,18 @@ pub fn run() {
                                 let _ = app.emit("navigate-to", "settings");
                             }
                         }
-                        "quick_log" => {
-                            let _ = db::quick_log_with_defaults_impl();
+                        "quick_log_home" => {
+                            let _ = db::quick_log_with_location_impl("home");
+                            let _ = app.emit("timer-state-changed", ());
+                            update_tray_tooltip(app);
+                        }
+                        "quick_log_office" => {
+                            let _ = db::quick_log_with_location_impl("office");
+                            let _ = app.emit("timer-state-changed", ());
+                            update_tray_tooltip(app);
+                        }
+                        "quick_log_sick" => {
+                            let _ = db::quick_log_with_location_impl("sick");
                             let _ = app.emit("timer-state-changed", ());
                             update_tray_tooltip(app);
                         }

@@ -47,6 +47,7 @@ pub fn init_at(path: &Path) -> Result<()> {
         INSERT OR IGNORE INTO settings (key, value) VALUES ('idle_detection_enabled', '0');
         INSERT OR IGNORE INTO settings (key, value) VALUES ('idle_threshold_minutes', '5');
         INSERT OR IGNORE INTO settings (key, value) VALUES ('paused_due_to_idle', '0');
+        INSERT OR IGNORE INTO settings (key, value) VALUES ('theme', 'light');
         ",
     )?;
     let mut guard = DB_PATH.lock().unwrap();
@@ -182,25 +183,43 @@ pub fn update_session_duration_impl(session_id: i64, new_duration_minutes: i32) 
     Ok(())
 }
 
-/// Quick log using defaults: today's date, default location, expected_hours/5 as duration.
-pub fn quick_log_with_defaults_impl() -> Result<i64, String> {
+/// Quick log with explicit location: today's date. For sick days uses 0 hours; otherwise expected_hours/5.
+pub fn quick_log_with_location_impl(location: &str) -> Result<i64, String> {
     let date = Utc::now().format("%Y-%m-%d").to_string();
-    let location = get_setting("default_location").unwrap_or_else(|_| "home".to_string());
-    let location = if location == "office" { "office" } else { "home" };
-    let expected_hours: u32 = get_setting("expected_hours_per_week")
-        .unwrap_or_else(|_| "40".to_string())
-        .parse()
-        .unwrap_or(40);
-    let default_day_hours = expected_hours as f64 / 5.0;
-    let duration_minutes = (default_day_hours * 60.0).round() as i32;
-    let duration_minutes = duration_minutes.max(60).min(24 * 60);
+    let location = match location {
+        "office" => "office",
+        "sick" => "sick",
+        _ => "home",
+    };
+    let duration_minutes = if location == "sick" {
+        0
+    } else {
+        let expected_hours: u32 = get_setting("expected_hours_per_week")
+            .unwrap_or_else(|_| "40".to_string())
+            .parse()
+            .unwrap_or(40);
+        let default_day_hours = expected_hours as f64 / 5.0;
+        let d = (default_day_hours * 60.0).round() as i32;
+        d.max(60).min(24 * 60)
+    };
     log_full_day_impl(&date, &location, duration_minutes)
 }
 
+/// Quick log using defaults: today's date, default location, expected_hours/5 as duration.
+pub fn quick_log_with_defaults_impl() -> Result<i64, String> {
+    let location = get_setting("default_location").unwrap_or_else(|_| "home".to_string());
+    quick_log_with_location_impl(&location)
+}
+
 /// Log a full work day without using the timer. Inserts a completed session.
+/// For sick days, duration_minutes may be 0. Otherwise must be 1–1440.
 pub fn log_full_day_impl(date: &str, location: &str, duration_minutes: i32) -> Result<i64, String> {
-    if duration_minutes <= 0 || duration_minutes > 24 * 60 {
-        return Err("duration must be between 1 and 1440 minutes".to_string());
+    let allow_zero = location == "sick";
+    if duration_minutes < 0
+        || duration_minutes > 24 * 60
+        || (duration_minutes == 0 && !allow_zero)
+    {
+        return Err("duration must be 1–1440 minutes (or 0 for sick days)".to_string());
     }
     let start_time = format!("{} 09:00:00", date);
     let start = chrono::NaiveDateTime::parse_from_str(&start_time, "%Y-%m-%d %H:%M:%S")
@@ -333,7 +352,7 @@ pub fn get_sessions_impl() -> Result<Vec<SessionRow>, String> {
     sessions.map_err(|e| e.to_string())
 }
 
-const USER_SETTING_KEYS: &[&str] = &["expected_hours_per_week", "default_location", "enable_overtime_alerts", "idle_detection_enabled", "idle_threshold_minutes"];
+const USER_SETTING_KEYS: &[&str] = &["expected_hours_per_week", "default_location", "enable_overtime_alerts", "idle_detection_enabled", "idle_threshold_minutes", "theme"];
 
 #[derive(serde::Serialize)]
 pub struct Settings {
@@ -342,6 +361,7 @@ pub struct Settings {
     pub enable_overtime_alerts: bool,
     pub idle_detection_enabled: bool,
     pub idle_threshold_minutes: u32,
+    pub theme: String,
 }
 
 /// Get user-facing settings (excludes internal keys like active_session_*).
@@ -371,12 +391,19 @@ pub fn get_settings_impl() -> Result<Settings, String> {
         .parse::<u32>()
         .unwrap_or(5);
     let idle_threshold_minutes = idle_threshold_minutes.clamp(1, 60);
+    let theme = get_setting("theme").unwrap_or_else(|_| "light".to_string());
+    let theme = if ["light", "dark", "system"].contains(&theme.as_str()) {
+        theme
+    } else {
+        "light".to_string()
+    };
     Ok(Settings {
         expected_hours_per_week: expected,
         default_location,
         enable_overtime_alerts,
         idle_detection_enabled,
         idle_threshold_minutes,
+        theme,
     })
 }
 
@@ -399,6 +426,9 @@ pub fn save_setting_impl(key: &str, value: &str) -> Result<(), String> {
         if !(1..=60).contains(&n) {
             return Err("idle_threshold_minutes must be 1–60".to_string());
         }
+    }
+    if key == "theme" && value != "light" && value != "dark" && value != "system" {
+        return Err("theme must be 'light', 'dark', or 'system'".to_string());
     }
     set_setting(key, value).map_err(|e| e.to_string())
 }

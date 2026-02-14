@@ -94,6 +94,7 @@ function App() {
     enable_overtime_alerts: true,
     idle_detection_enabled: false,
     idle_threshold_minutes: 5,
+    theme: "light",
   });
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [weeklySummary, setWeeklySummary] = useState(null);
@@ -112,13 +113,17 @@ function App() {
   const [leaveEarlyTarget, setLeaveEarlyTarget] = useState(null);
   const [hasShownOvertimeAlert, setHasShownOvertimeAlert] = useState(false);
   const [toast, setToast] = useState(null);
-  const [quickLogOpen, setQuickLogOpen] = useState(false);
-  const [sessionsOpen, setSessionsOpen] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
 
   function showToast(message, type = "success") {
     setToast({ message, type });
     setTimeout(() => setToast(null), type === "error" ? 4000 : 2500);
+  }
+
+  function applyTheme(theme) {
+    const resolved =
+      theme === "system" ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : theme;
+    document.documentElement.setAttribute("data-theme", resolved);
   }
 
   useEffect(() => {
@@ -129,8 +134,10 @@ function App() {
       .catch(() => setWeeklySummary(null));
     invoke("get_settings")
       .then((s) => {
-        setSettings(s);
+        const theme = s.theme || "light";
+        setSettings({ ...s, theme });
         setLocation(s.default_location || "home");
+        applyTheme(theme);
       })
       .catch(() => {});
     invoke("get_financial_years_with_data")
@@ -142,7 +149,7 @@ function App() {
       refreshAppData(setSessions, setWeeklySummary, setFinancialYears);
     });
     const unlistenNav = listen("navigate-to", (e) => {
-      if (e.payload && ["tracker", "export", "settings"].includes(e.payload)) {
+      if (e.payload && ["tracker", "quicklog", "sessions", "export", "settings"].includes(e.payload)) {
         setView(e.payload);
       }
     });
@@ -344,8 +351,8 @@ function App() {
   async function handleLogDay(e) {
     e.preventDefault();
     try {
-      const mins = Math.round(logDayHours * 60);
-      if (mins < 1 || mins > 24 * 60) {
+      const mins = logDayLocation === "sick" ? 0 : Math.round(logDayHours * 60);
+      if (logDayLocation !== "sick" && (mins < 1 || mins > 24 * 60)) {
         showToast("Hours must be between 0.01 and 24", "error");
         return;
       }
@@ -355,7 +362,7 @@ function App() {
         durationMinutes: mins,
       });
       refreshAppData(setSessions, setWeeklySummary, setFinancialYears);
-      showToast("Day logged");
+      showToast(logDayLocation === "sick" ? "Sick day logged" : "Day logged");
     } catch (err) {
       showToast(`Error: ${err}`, "error");
     }
@@ -395,9 +402,50 @@ function App() {
     }
   }
 
+  async function setThemeAndSave(theme) {
+    applyTheme(theme);
+    setSettings((s) => ({ ...s, theme }));
+    try {
+      await invoke("save_setting", { key: "theme", value: theme });
+    } catch {
+      /* ignore save errors */
+    }
+  }
+
   return (
     <main className="container">
-      <h1>Work Day Tracker</h1>
+      <header className="app-header">
+        <h1>Work Day Tracker</h1>
+        <div className="theme-toggle" role="group" aria-label="Theme">
+          <button
+            type="button"
+            className={"theme-btn" + (settings.theme === "light" ? " active" : "")}
+            onClick={() => setThemeAndSave("light")}
+            title="Light mode"
+            aria-pressed={settings.theme === "light"}
+          >
+            ☀
+          </button>
+          <button
+            type="button"
+            className={"theme-btn" + (settings.theme === "dark" ? " active" : "")}
+            onClick={() => setThemeAndSave("dark")}
+            title="Dark mode"
+            aria-pressed={settings.theme === "dark"}
+          >
+            ☽
+          </button>
+          <button
+            type="button"
+            className={"theme-btn" + (settings.theme === "system" ? " active" : "")}
+            onClick={() => setThemeAndSave("system")}
+            title="Use system preference"
+            aria-pressed={settings.theme === "system"}
+          >
+            ◐
+          </button>
+        </div>
+      </header>
 
       <nav className="app-nav">
         <button
@@ -406,6 +454,20 @@ function App() {
           onClick={() => setView("tracker")}
         >
           Tracker
+        </button>
+        <button
+          type="button"
+          className={"nav-link" + (view === "quicklog" ? " active" : "")}
+          onClick={() => setView("quicklog")}
+        >
+          Quick log
+        </button>
+        <button
+          type="button"
+          className={"nav-link" + (view === "sessions" ? " active" : "")}
+          onClick={() => setView("sessions")}
+        >
+          Sessions {sessions.length > 0 && <span className="section-count">({sessions.length})</span>}
         </button>
         <button
           type="button"
@@ -522,42 +584,36 @@ function App() {
               )}
             </section>
           )}
+        </>
+      )}
 
-          <section className="section log-day-section collapsible-section">
-            <button
-              type="button"
-              className="section-toggle"
-              onClick={() => setQuickLogOpen(!quickLogOpen)}
-              aria-expanded={quickLogOpen}
-            >
-              <h2>Quick log</h2>
-              <span className="collapse-icon">{quickLogOpen ? "▴" : "▾"}</span>
-            </button>
-            {quickLogOpen && (
-              <>
-                <p className="log-day-hint">Log a full work day without using the timer</p>
-                <form onSubmit={handleLogDay} className="log-day-form">
-                  <div className="log-day-row">
-                    <label>
-                      Date
-                      <input
-                        type="date"
-                        value={logDayDate}
-                        onChange={(e) => setLogDayDate(e.target.value)}
-                        className="log-day-input"
-                      />
-                    </label>
-                    <label>
-                      Location
-                      <select
-                        value={logDayLocation}
-                        onChange={(e) => setLogDayLocation(e.target.value)}
-                        className="location-picker"
-                      >
-                        <option value="home">Home</option>
-                        <option value="office">Office</option>
-                      </select>
-                    </label>
+      {view === "quicklog" && (
+            <section className="section log-day-section">
+              <p className="log-day-hint">Log a full work day without using the timer</p>
+              <form onSubmit={handleLogDay} className="log-day-form">
+                <div className="log-day-row">
+                  <label>
+                    Date
+                    <input
+                      type="date"
+                      value={logDayDate}
+                      onChange={(e) => setLogDayDate(e.target.value)}
+                      className="log-day-input"
+                    />
+                  </label>
+                  <label>
+                    Location
+                    <select
+                      value={logDayLocation}
+                      onChange={(e) => setLogDayLocation(e.target.value)}
+                      className="location-picker"
+                    >
+                      <option value="home">Home</option>
+                      <option value="office">Office</option>
+                      <option value="sick">Sick</option>
+                    </select>
+                  </label>
+                  {logDayLocation !== "sick" && (
                     <label>
                       Hours
                       <input
@@ -570,102 +626,91 @@ function App() {
                         className="log-day-hours"
                       />
                     </label>
-                  </div>
-                  <button type="submit" className="log-day-btn">
-                    Log day
-                  </button>
-                </form>
-              </>
-            )}
-          </section>
-
-          <section className="section sessions-section collapsible-section">
-            <button
-              type="button"
-              className="section-toggle"
-              onClick={() => setSessionsOpen(!sessionsOpen)}
-              aria-expanded={sessionsOpen}
-            >
-              <h2>Sessions {sessions.length > 0 && <span className="section-count">({sessions.length})</span>}</h2>
-              <span className="collapse-icon">{sessionsOpen ? "▴" : "▾"}</span>
-            </button>
-            {sessionsOpen && (
-              <>
-                <div className="sessions-header">
-                  <select
-                    value={sessionFilter}
-                    onChange={(e) => {
-                      setSessionFilter(e.target.value);
-                      setSessionsDisplayLimit(SESSION_DISPLAY_INCREMENT);
-                    }}
-                    className="session-filter"
-                  >
-                    <option value="all">All</option>
-                    <option value="today">Today</option>
-                    <option value="week">This week</option>
-                    <option value="month">This month</option>
-                  </select>
+                  )}
                 </div>
-                <p className="sessions-hint">
-                  {sessionFilter === "all"
-                    ? "All completed sessions, newest first"
-                    : `Filtered to ${sessionFilter === "today" ? "today" : sessionFilter === "week" ? "this week" : "this month"}`}
-                </p>
-                {sessions.length === 0 ? (
-                  <p className="sessions-empty">No sessions yet.</p>
-                ) : (
-                  (() => {
-                    const filtered = filterSessions(sessions, sessionFilter);
-                    if (filtered.length === 0) {
-                      return <p className="sessions-empty">No sessions in this period.</p>;
-                    }
-                    const displayed = filtered.slice(0, sessionsDisplayLimit);
-                    const hasMore = displayed.length < filtered.length;
-                    return (
-                      <>
-                        <ul className="sessions-list">
-                          {displayed.map((s) => (
-                            <li key={s.id} className="session-item">
-                              <span className="session-date">{formatDate(s.date)}</span>
-                              <span className="session-location">{s.location}</span>
-                              <span className="session-duration">{formatDuration(s.duration_minutes)}</span>
-                              <button
-                                type="button"
-                                className="session-edit-btn"
-                                onClick={() => openEditModal(s)}
-                                title="Edit duration"
-                                aria-label="Edit duration"
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                type="button"
-                                className="session-delete-btn"
-                                onClick={() => handleDeleteSession(s)}
-                                title="Delete session"
-                                aria-label="Delete session"
-                              >
-                                🗑️
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                        {hasMore && (
-                          <button
-                            type="button"
-                            className="show-more-btn"
-                            onClick={() => setSessionsDisplayLimit((n) => n + SESSION_DISPLAY_INCREMENT)}
-                          >
-                            Show more ({filtered.length - displayed.length} remaining)
-                          </button>
-                        )}
-                      </>
-                    );
-                  })()
-                )}
-              </>
-            )}
-          </section>
+                <button type="submit" className="log-day-btn">
+                  {logDayLocation === "sick" ? "Log sick day" : "Log day"}
+                </button>
+              </form>
+            </section>
+          )}
+
+{view === "sessions" && (
+        <section className="section sessions-section">
+              <div className="sessions-header">
+                <select
+                  value={sessionFilter}
+                  onChange={(e) => {
+                    setSessionFilter(e.target.value);
+                    setSessionsDisplayLimit(SESSION_DISPLAY_INCREMENT);
+                  }}
+                  className="session-filter"
+                >
+                  <option value="all">All</option>
+                  <option value="today">Today</option>
+                  <option value="week">This week</option>
+                  <option value="month">This month</option>
+                </select>
+              </div>
+              <p className="sessions-hint">
+                {sessionFilter === "all"
+                  ? "All completed sessions, newest first"
+                  : `Filtered to ${sessionFilter === "today" ? "today" : sessionFilter === "week" ? "this week" : "this month"}`}
+              </p>
+              {sessions.length === 0 ? (
+                <p className="sessions-empty">No sessions yet.</p>
+              ) : (
+                (() => {
+                  const filtered = filterSessions(sessions, sessionFilter);
+                  if (filtered.length === 0) {
+                    return <p className="sessions-empty">No sessions in this period.</p>;
+                  }
+                  const displayed = filtered.slice(0, sessionsDisplayLimit);
+                  const hasMore = displayed.length < filtered.length;
+                  return (
+                    <>
+                      <ul className="sessions-list">
+                        {displayed.map((s) => (
+                          <li key={s.id} className="session-item">
+                            <span className="session-date">{formatDate(s.date)}</span>
+                            <span className="session-location">{s.location}</span>
+                            <span className="session-duration">{formatDuration(s.duration_minutes)}</span>
+                            <button
+                              type="button"
+                              className="session-edit-btn"
+                              onClick={() => openEditModal(s)}
+                              title="Edit duration"
+                              aria-label="Edit duration"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              type="button"
+                              className="session-delete-btn"
+                              onClick={() => handleDeleteSession(s)}
+                              title="Delete session"
+                              aria-label="Delete session"
+                            >
+                              🗑️
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                      {hasMore && (
+                        <button
+                          type="button"
+                          className="show-more-btn"
+                          onClick={() => setSessionsDisplayLimit((n) => n + SESSION_DISPLAY_INCREMENT)}
+                        >
+                          Show more ({filtered.length - displayed.length} remaining)
+                        </button>
+                      )}
+                    </>
+                  );
+                })()
+              )}
+            </section>
+          )}
           {overtimeModal && (
             <div
               className="edit-modal-overlay"
@@ -750,8 +795,6 @@ function App() {
               </div>
             </div>
           )}
-        </>
-      )}
 
       {view === "export" && (
         <section className="section export-view">
@@ -822,6 +865,38 @@ function App() {
                 <option value="home">Home</option>
                 <option value="office">Office</option>
               </select>
+            </div>
+            <div className="settings-field">
+              <label>Theme</label>
+              <div className="theme-options">
+                <label className="theme-option">
+                  <input
+                    type="radio"
+                    name="theme"
+                    checked={settings.theme === "light"}
+                    onChange={() => setThemeAndSave("light")}
+                  />
+                  Light
+                </label>
+                <label className="theme-option">
+                  <input
+                    type="radio"
+                    name="theme"
+                    checked={settings.theme === "dark"}
+                    onChange={() => setThemeAndSave("dark")}
+                  />
+                  Dark
+                </label>
+                <label className="theme-option">
+                  <input
+                    type="radio"
+                    name="theme"
+                    checked={settings.theme === "system"}
+                    onChange={() => setThemeAndSave("system")}
+                  />
+                  System
+                </label>
+              </div>
             </div>
             <label className="settings-checkbox-label">
               <input
