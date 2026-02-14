@@ -1,4 +1,4 @@
-use chrono::Utc;
+use chrono::{Datelike, Utc};
 use rusqlite::{params, Connection, Result};
 use std::path::Path;
 use std::sync::Mutex;
@@ -256,4 +256,47 @@ pub fn save_setting_impl(key: &str, value: &str) -> Result<(), String> {
         return Err("default_location must be 'home' or 'office'".to_string());
     }
     set_setting(key, value).map_err(|e| e.to_string())
+}
+
+#[derive(serde::Serialize)]
+pub struct WeeklySummary {
+    pub week_start: String,
+    pub actual_minutes: u32,
+    pub expected_minutes: u32,
+    pub difference_minutes: i32,
+}
+
+/// Summary for the current ISO week (Monday–Sunday).
+pub fn get_weekly_summary_impl() -> Result<WeeklySummary, String> {
+    let now = Utc::now().date_naive();
+    let weekday = now.weekday();
+    let days_from_monday = weekday.num_days_from_monday() as i64;
+    let monday = now - chrono::Duration::days(days_from_monday);
+    let week_end = monday + chrono::Duration::days(6);
+    let week_start = monday.format("%Y-%m-%d").to_string();
+    let week_end_str = week_end.format("%Y-%m-%d").to_string();
+
+    let conn = get_connection().map_err(|e| e.to_string())?;
+    let actual: i64 = conn
+        .query_row(
+            "SELECT COALESCE(SUM(duration_minutes), 0) FROM sessions
+             WHERE end_time IS NOT NULL AND date >= ?1 AND date <= ?2",
+            params![week_start, week_end_str],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+
+    let expected_hours: u32 = get_setting("expected_hours_per_week")
+        .unwrap_or_else(|_| "40".to_string())
+        .parse()
+        .unwrap_or(40);
+    let expected_minutes = expected_hours * 60;
+    let difference_minutes = actual as i32 - expected_minutes as i32;
+
+    Ok(WeeklySummary {
+        week_start,
+        actual_minutes: actual.max(0) as u32,
+        expected_minutes,
+        difference_minutes,
+    })
 }

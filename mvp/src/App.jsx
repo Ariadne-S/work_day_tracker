@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { format } from "date-fns";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 
@@ -13,6 +14,11 @@ function refreshState(setTimerState) {
   invoke("get_timer_state")
     .then((s) => setTimerState(s))
     .catch((e) => setTimerState({ status: `Error: ${e}`, elapsed_seconds: 0 }));
+}
+
+function formatDate(isoDate) {
+  if (!isoDate) return "—";
+  return format(new Date(isoDate + "T12:00:00"), "dd MMM yyyy");
 }
 
 function formatDuration(minutes) {
@@ -36,16 +42,20 @@ function App() {
   const [sessions, setSessions] = useState([]);
   const [settings, setSettings] = useState({ expected_hours_per_week: 40, default_location: "home" });
   const [settingsSaved, setSettingsSaved] = useState(false);
+  const [weeklySummary, setWeeklySummary] = useState(null);
 
   useEffect(() => {
     refreshState(setTimerState);
     refreshSessions(setSessions);
+    invoke("get_weekly_summary")
+      .then((s) => setWeeklySummary(s))
+      .catch(() => setWeeklySummary(null));
     invoke("get_settings")
       .then((s) => {
         setSettings(s);
         setLocation(s.default_location || "home");
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -68,6 +78,7 @@ function App() {
       await invoke("stop_session", { elapsedSeconds: timerState.elapsed_seconds });
       refreshState(setTimerState);
       refreshSessions(setSessions);
+      invoke("get_weekly_summary").then((s) => setWeeklySummary(s)).catch(() => { });
     } catch (e) {
       setTimerState({ status: `Error: ${e}`, elapsed_seconds: timerState.elapsed_seconds });
     }
@@ -103,6 +114,7 @@ function App() {
         value: settings.default_location,
       });
       setLocation(settings.default_location);
+      invoke("get_weekly_summary").then((s) => setWeeklySummary(s)).catch(() => { });
       setSettingsSaved(true);
       setTimeout(() => setSettingsSaved(false), 2000);
     } catch (e) {
@@ -113,7 +125,7 @@ function App() {
   return (
     <main className="container">
       <h1>Work Day Tracker</h1>
-      <p className="subtitle">Slice 7: Settings</p>
+      <p className="subtitle">Slice 8: Weekly summary</p>
 
       <div className="timer-display">
         <span className="timer-time" data-testid="timer-display">
@@ -162,6 +174,32 @@ function App() {
         )}
       </div>
 
+      {weeklySummary && (
+        <section className="summary-section">
+          <h2>This week</h2>
+          <div className="summary-grid">
+            <span className="summary-label">Today</span>
+            <span className="summary-value">{format(new Date(), "EEE dd MMM yyyy")}</span>
+            <span className="summary-label">Week of</span>
+            <span className="summary-value">{formatDate(weeklySummary.week_start)}</span>
+            <span className="summary-label">Actual</span>
+            <span className="summary-value">{formatDuration(weeklySummary.actual_minutes)}</span>
+            <span className="summary-label">Expected</span>
+            <span className="summary-value">{formatDuration(weeklySummary.expected_minutes)}</span>
+            <span className="summary-label">Difference</span>
+            <span
+              className={
+                "summary-value summary-diff " +
+                (weeklySummary.difference_minutes >= 0 ? "summary-over" : "summary-under")
+              }
+            >
+              {weeklySummary.difference_minutes >= 0 ? "+" : ""}
+              {formatDuration(Math.abs(weeklySummary.difference_minutes))}
+            </span>
+          </div>
+        </section>
+      )}
+
       <section className="sessions-section">
         <h2>Sessions</h2>
         {sessions.length === 0 ? (
@@ -170,7 +208,7 @@ function App() {
           <ul className="sessions-list">
             {sessions.map((s) => (
               <li key={s.id} className="session-item">
-                <span className="session-date">{s.date}</span>
+                <span className="session-date">{formatDate(s.date)}</span>
                 <span className="session-location">{s.location}</span>
                 <span className="session-duration">{formatDuration(s.duration_minutes)}</span>
               </li>

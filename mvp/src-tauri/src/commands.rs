@@ -56,3 +56,8 @@ pub fn get_settings() -> Result<db::Settings, String> {
 pub fn save_setting(key: String, value: String) -> Result<(), String> {
     db::save_setting_impl(&key, &value)
 }
+
+#[tauri::command]
+pub fn get_weekly_summary() -> Result<db::WeeklySummary, String> {
+    db::get_weekly_summary_impl()
+}
