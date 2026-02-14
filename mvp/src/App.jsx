@@ -2,6 +2,13 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 
+function formatElapsed(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return [h, m, s].map((n) => String(n).padStart(2, "0")).join(":");
+}
+
 function refreshState(setTimerState) {
   invoke("get_timer_state")
     .then((s) => setTimerState(s))
@@ -9,9 +16,8 @@ function refreshState(setTimerState) {
 }
 
 function App() {
-  const [pingResponse, setPingResponse] = useState("");
-  const [loading, setLoading] = useState(false);
   const [timerState, setTimerState] = useState({ status: "", elapsed_seconds: 0 });
+  const [location, setLocation] = useState("home");
 
   useEffect(() => {
     refreshState(setTimerState);
@@ -23,22 +29,9 @@ function App() {
     return () => clearInterval(id);
   }, [timerState.status]);
 
-  async function handlePing() {
-    setLoading(true);
-    setPingResponse("");
-    try {
-      const response = await invoke("ping");
-      setPingResponse(response);
-    } catch (e) {
-      setPingResponse(`Error: ${e}`);
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function handleStart() {
     try {
-      await invoke("start_session", { location: "home" });
+      await invoke("start_session", { location });
       refreshState(setTimerState);
     } catch (e) {
       setTimerState({ status: `Error: ${e}`, elapsed_seconds: 0 });
@@ -75,51 +68,54 @@ function App() {
   return (
     <main className="container">
       <h1>Work Day Tracker</h1>
-      <p>Slice 4: pause_session / resume_session</p>
+      <p className="subtitle">Slice 5: Timer UI</p>
 
-      <p data-testid="timer-status">Status: {timerState.status || "—"}</p>
-
-      <div className="row">
-        <button
-          type="button"
-          onClick={handleStart}
-          disabled={timerState.status === "running"}
-        >
-          Start
-        </button>
-        <button
-          type="button"
-          onClick={handleStop}
-          disabled={timerState.status !== "running"}
-        >
-          Stop
-        </button>
-        <button
-          type="button"
-          onClick={handlePause}
-          disabled={timerState.status !== "running"}
-        >
-          Pause
-        </button>
-        <button
-          type="button"
-          onClick={handleResume}
-          disabled={timerState.status !== "paused"}
-        >
-          Resume
-        </button>
-        <button
-          type="button"
-          onClick={handlePing}
-          disabled={loading}
-        >
-          {loading ? "Pinging..." : "Ping"}
-        </button>
+      <div className="timer-display">
+        <span className="timer-time" data-testid="timer-display">
+          {formatElapsed(timerState.elapsed_seconds)}
+        </span>
+        <span className="timer-status" data-testid="timer-status">
+          {timerState.status || "—"}
+        </span>
       </div>
 
-      {pingResponse && (
-        <p data-testid="ping-response">Response: {pingResponse}</p>
-      )}
+      <div className="location-row">
+        <span className="location-label">Location:</span>
+        <select
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          disabled={timerState.status === "running" || timerState.status === "paused"}
+          className="location-picker"
+        >
+          <option value="home">Home</option>
+          <option value="office">Office</option>
+        </select>
+      </div>
+
+      <div className="row">
+        {timerState.status !== "running" && timerState.status !== "paused" && (
+          <button type="button" onClick={handleStart}>
+            Start
+          </button>
+        )}
+        {(timerState.status === "running" || timerState.status === "paused") && (
+          <>
+            {timerState.status === "running" && (
+              <button type="button" onClick={handlePause}>
+                Pause
+              </button>
+            )}
+            {timerState.status === "paused" && (
+              <button type="button" onClick={handleResume}>
+                Resume
+              </button>
+            )}
+            <button type="button" onClick={handleStop}>
+              Stop
+            </button>
+          </>
+        )}
+      </div>
     </main>
   );
 }
