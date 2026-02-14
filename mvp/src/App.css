@@ -113,6 +113,63 @@
   gap: 0.75em;
 }
 
+.log-day-section h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.25em;
+}
+
+.log-day-hint {
+  font-size: 0.85rem;
+  color: #666;
+  margin: 0 0 0.75em 0;
+}
+
+.log-day-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+
+.log-day-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75em;
+  align-items: flex-end;
+}
+
+.log-day-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25em;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.log-day-input {
+  padding: 0.4em 0.6em;
+  width: 10em;
+}
+
+.log-day-hours {
+  padding: 0.4em 0.6em;
+  width: 4em;
+}
+
+.log-day-btn {
+  align-self: flex-start;
+  padding: 0.5em 1em;
+  border-radius: 6px;
+  border: 1px solid #24c8db;
+  background: #fff;
+  color: #0f0f0f;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.log-day-btn:hover {
+  background: #e8f9fb;
+}
+
 .section {
   margin-top: 1.5em;
   text-align: left;
@@ -446,6 +503,20 @@ button.timer-btn {
   .sessions-hint,
   .sessions-empty {
     color: #888;
+  }
+
+  .log-day-hint {
+    color: #888;
+  }
+
+  .log-day-btn {
+    border-color: #24c8db;
+    background: transparent;
+    color: #24c8db;
+  }
+
+  .log-day-btn:hover {
+    background: rgba(36, 200, 219, 0.15);
   }
 
   .session-filter {

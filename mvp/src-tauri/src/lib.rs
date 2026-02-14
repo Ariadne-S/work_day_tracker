@@ -8,7 +8,7 @@ pub fn run_seed(path: &std::path::Path, force: bool) -> Result<u32, String> {
     db::seed_sample_data_impl(force)
 }
 
-use commands::{get_export_csv_by_fy, get_export_csv_for_fy, get_financial_years_with_data, get_sessions, get_settings, get_timer_state, get_weekly_summary, pause_session, ping, resume_session, save_setting, seed_sample_data, start_session, stop_session};
+use commands::{get_export_csv_by_fy, get_export_csv_for_fy, get_financial_years_with_data, get_sessions, get_settings, get_timer_state, get_weekly_summary, log_full_day, pause_session, ping, resume_session, save_setting, seed_sample_data, start_session, stop_session};
 use tauri::{Emitter, Manager};
 
 #[cfg(test)]
@@ -183,7 +183,22 @@ mod tests {
         assert_eq!(db::australian_fy_from_date("2024-06-30"), Some(2024));
         assert_eq!(db::australian_fy_from_date("2024-07-01"), Some(2025));
         assert_eq!(db::australian_fy_from_date("2024-01-15"), Some(2024));
-        assert_eq!(db::australian_fy_from_date("2023-12-31"), Some(2023));
+        assert_eq!(db::australian_fy_from_date("2023-12-31"), Some(2024)); // Dec 31 2023 is in FY2024 (Jul 2023–Jun 2024)
+    }
+
+    #[test]
+    #[serial]
+    fn test_log_full_day() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let db_path = dir.path().join("test.db");
+        db::init_at(&db_path).expect("db init failed");
+        let id = log_full_day("2025-02-14".into(), "office".into(), 480).expect("log_full_day failed");
+        assert!(id > 0);
+        let sessions = db::get_sessions_impl().expect("get_sessions failed");
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].location, "office");
+        assert_eq!(sessions[0].duration_minutes, Some(480));
+        assert_eq!(sessions[0].date, "2025-02-14");
     }
 
     #[test]
@@ -324,7 +339,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![ping, get_timer_state, start_session, stop_session, pause_session, resume_session, get_sessions, get_settings, save_setting, get_weekly_summary, get_export_csv_by_fy, get_export_csv_for_fy, get_financial_years_with_data, seed_sample_data])
+        .invoke_handler(tauri::generate_handler![ping, get_timer_state, start_session, stop_session, pause_session, resume_session, get_sessions, get_settings, save_setting, get_weekly_summary, get_export_csv_by_fy, get_export_csv_for_fy, get_financial_years_with_data, seed_sample_data, log_full_day])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 window.hide().unwrap();

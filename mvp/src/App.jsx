@@ -91,6 +91,10 @@ function App() {
   const [view, setView] = useState("tracker");
   const [sessionFilter, setSessionFilter] = useState("all");
   const [sessionsDisplayLimit, setSessionsDisplayLimit] = useState(SESSION_DISPLAY_INCREMENT);
+  const [logDayDate, setLogDayDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [logDayLocation, setLogDayLocation] = useState("home");
+  const [logDayHours, setLogDayHours] = useState(8);
+  const [logDayStatus, setLogDayStatus] = useState("");
 
   useEffect(() => {
     refreshState(setTimerState);
@@ -216,6 +220,28 @@ function App() {
     }
   }
 
+  async function handleLogDay(e) {
+    e.preventDefault();
+    try {
+      const mins = Math.round(logDayHours * 60);
+      if (mins < 1 || mins > 24 * 60) {
+        setLogDayStatus("Hours must be between 0.01 and 24");
+        return;
+      }
+      await invoke("log_full_day", {
+        date: logDayDate,
+        location: logDayLocation,
+        durationMinutes: mins,
+      });
+      refreshAppData(setSessions, setWeeklySummary, setFinancialYears);
+      setLogDayStatus("Logged");
+      setTimeout(() => setLogDayStatus(""), 2000);
+    } catch (err) {
+      setLogDayStatus(`Error: ${err}`);
+      setTimeout(() => setLogDayStatus(""), 3000);
+    }
+  }
+
   async function handleSaveSettings(e) {
     e.preventDefault();
     try {
@@ -312,6 +338,50 @@ function App() {
           </>
         )}
       </div>
+
+      <section className="section log-day-section">
+        <h2>Quick log</h2>
+        <p className="log-day-hint">Log a full work day without using the timer</p>
+        <form onSubmit={handleLogDay} className="log-day-form">
+          <div className="log-day-row">
+            <label>
+              Date
+              <input
+                type="date"
+                value={logDayDate}
+                onChange={(e) => setLogDayDate(e.target.value)}
+                className="log-day-input"
+              />
+            </label>
+            <label>
+              Location
+              <select
+                value={logDayLocation}
+                onChange={(e) => setLogDayLocation(e.target.value)}
+                className="location-picker"
+              >
+                <option value="home">Home</option>
+                <option value="office">Office</option>
+              </select>
+            </label>
+            <label>
+              Hours
+              <input
+                type="number"
+                min="0.25"
+                max="24"
+                step="0.25"
+                value={logDayHours}
+                onChange={(e) => setLogDayHours(parseFloat(e.target.value) || 8)}
+                className="log-day-hours"
+              />
+            </label>
+          </div>
+          <button type="submit" className="log-day-btn">
+            {logDayStatus || "Log day"}
+          </button>
+        </form>
+      </section>
 
       {weeklySummary && (
         <section className="section summary-section">

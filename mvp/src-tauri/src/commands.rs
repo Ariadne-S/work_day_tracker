@@ -47,6 +47,12 @@ pub fn get_sessions() -> Result<Vec<db::SessionRow>, String> {
     db::get_sessions_impl()
 }
 
+/// Log a full work day without using the timer.
+#[tauri::command]
+pub fn log_full_day(date: String, location: String, duration_minutes: i32) -> Result<i64, String> {
+    db::log_full_day_impl(&date, &location, duration_minutes)
+}
+
 #[tauri::command]
 pub fn get_settings() -> Result<db::Settings, String> {
     db::get_settings_impl()

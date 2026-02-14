@@ -183,11 +183,72 @@ Each slice: **Backend → Unit test → Frontend → Manual validation** before 
 
 ---
 
-### Slice 11: Auto-Pause (Later)
-**Goal:** Pause when idle, resume on activity.
+## Next Steps (Post-MVP)
 
-- Platform-specific idle detection
-- Integrate with pause/resume
+Planned features in recommended implementation order:
+
+### 1. Quick log (full day) ✓
+**Goal:** Log a full work day at a location without using the timer.
+
+- **Backend:** `log_full_day(date, location, duration_minutes)` – insert completed session directly
+- **DB:** Reuse existing `sessions` table; sessions have `end_time` and `duration_minutes` set immediately
+- **Frontend:** "Quick log" section in Tracker view – date picker, location, hours (0.25–24). One row per day+location
+- **Test:** `test_log_full_day`
+
+**Validation:** Logged days appear in sessions list and export.
+
+---
+
+### 2. Edit logged time (add/remove breaks)
+**Goal:** Adjust duration of completed sessions (add break minutes, or reduce).
+
+- **Backend:** `update_session_duration(session_id, new_duration_minutes)` – UPDATE sessions SET duration_minutes = ? WHERE id = ?
+- **Frontend:** Edit control on each session row (pencil icon) – modal or inline: "Original: 8h 0m. Add break: +30m → 7h 30m" or "Adjust to: ___ h ___ m"
+- **DB:** Maybe add `duration_adjusted` or `break_minutes` column for audit; or keep it simple – just overwrite `duration_minutes` and optionally `notes` ("30m lunch break deducted")
+- **Export:** CSV uses the updated `duration_minutes`
+
+**Dependencies:** None. Can build anytime.
+
+---
+
+### 3. Overtime alerts
+**Goal:** Alert user on Friday when they've already hit weekly hours; offer "leave early" option.
+
+- **Logic:**
+  1. On Friday, when user clicks **Start** → before creating session, check: `actual_minutes_this_week >= expected_minutes`?
+  2. If yes → show modal: "You've already hit your weekly target. You can leave X hr early if you'd like. [Yes] [No]"
+  3. If **Yes** → store `overtime_leave_early_minutes` (or target time) in settings/session
+  4. When timer hits that time → show alert: "Your work week is accomplished!"
+  5. If **No** → start session as normal
+- **Backend:** `get_overtime_leave_early_minutes()` – returns surplus minutes this week, or 0. `set_leave_early_target(minutes)` – store target (expected - surplus) for today
+- **Frontend:** Modal before start (Friday only); listen for timer reaching target and show completion alert
+- **Settings:** Could add `enable_overtime_alerts` toggle
+
+**Dependencies:** `get_weekly_summary`, `start_session`. Build after Quick log if desired.
+
+---
+
+### 4. Idle detection (opt-in)
+**Goal:** Pause session when user is idle; resume on activity. Opt-in.
+
+- **Backend:** Platform-specific idle detection (macOS: `IOKit`/`CoreGraphics`, Windows: `GetLastInputInfo`). Poll every N seconds or use platform APIs.
+- **Settings:** `idle_detection_enabled`, `idle_threshold_minutes` (e.g. 5)
+- **Flow:** When idle > threshold and session running → call `pause_session`. When activity detected → call `resume_session`
+- **Tray:** Tooltip could show "Paused (idle)" vs "Paused (manual)"
+- **Dependencies:** `pause_session`, `resume_session`
+
+**Dependencies:** Pause/resume. Most complex – platform-specific code, background polling.
+
+---
+
+## Recommended order
+
+| Order | Feature        | Complexity | Reason                                      |
+|-------|----------------|------------|---------------------------------------------|
+| 1     | Quick log      | Low        | Simple insert; no timer logic               |
+| 2     | Edit duration  | Low        | Single UPDATE; straightforward UI           |
+| 3     | Overtime alerts| Medium     | Modals, Friday check, timer target logic    |
+| 4     | Idle detection | High       | Platform APIs, background work, opt-in UX   |
 
 ---
 
@@ -195,8 +256,8 @@ Each slice: **Backend → Unit test → Frontend → Manual validation** before 
 
 | Table        | Purpose                                                                       |
 | ------------ | ----------------------------------------------------------------------------- |
-| `sessions`   | id, date, start_time, end_time, duration_minutes, location (home/office), notes |
-| `settings`   | key, value (expected_hours_per_day, default_location, idle_threshold_minutes)  |
+| `sessions`   | id, date, start_time, end_time, duration_minutes, location (home/office), notes. Optional: `source` (timer \| quick_log) |
+| `settings`   | key, value (expected_hours_per_week, default_location, idle_detection_enabled, idle_threshold_minutes, leave_early_target_minutes) |
 | `pause_events` | For audit trail of pauses (optional)                                        |
 
 ---

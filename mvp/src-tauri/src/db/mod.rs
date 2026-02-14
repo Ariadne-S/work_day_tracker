@@ -131,6 +131,26 @@ pub fn resume_session_impl() -> Result<(), String> {
     Ok(())
 }
 
+/// Log a full work day without using the timer. Inserts a completed session.
+pub fn log_full_day_impl(date: &str, location: &str, duration_minutes: i32) -> Result<i64, String> {
+    if duration_minutes <= 0 || duration_minutes > 24 * 60 {
+        return Err("duration must be between 1 and 1440 minutes".to_string());
+    }
+    let start_time = format!("{} 09:00:00", date);
+    let start = chrono::NaiveDateTime::parse_from_str(&start_time, "%Y-%m-%d %H:%M:%S")
+        .map_err(|_| "invalid date format (use YYYY-MM-DD)".to_string())?;
+    let end = start + chrono::Duration::minutes(duration_minutes as i64);
+    let end_time = end.format("%Y-%m-%d %H:%M:%S").to_string();
+
+    let conn = get_connection().map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO sessions (date, start_time, end_time, duration_minutes, location) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![date, start_time, end_time, duration_minutes, location],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(conn.last_insert_rowid())
+}
+
 /// Stop the active session with final elapsed seconds.
 pub fn stop_session_impl(elapsed_seconds: u64) -> Result<(), String> {
     let session_id: String = get_setting("active_session_id").map_err(|e| e.to_string())?;
