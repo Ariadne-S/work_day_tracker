@@ -109,6 +109,10 @@
   flex-wrap: wrap;
 }
 
+.timer-controls {
+  gap: 0.75em;
+}
+
 .section {
   margin-top: 1.5em;
   text-align: left;
@@ -397,6 +401,12 @@ button:active {
 input,
 button {
   outline: none;
+}
+
+button.timer-btn {
+  padding: 1em 2em;
+  font-size: 1.15rem;
+  min-width: 6.5rem;
 }
 
 @media (prefers-color-scheme: dark) {

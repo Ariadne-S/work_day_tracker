@@ -288,25 +288,25 @@ function App() {
         </select>
       </div>
 
-      <div className="row">
+      <div className="row timer-controls">
         {timerState.status !== "running" && timerState.status !== "paused" && (
-          <button type="button" onClick={handleStart}>
+          <button type="button" onClick={handleStart} className="timer-btn">
             Start
           </button>
         )}
         {(timerState.status === "running" || timerState.status === "paused") && (
           <>
             {timerState.status === "running" && (
-              <button type="button" onClick={handlePause}>
+              <button type="button" onClick={handlePause} className="timer-btn">
                 Pause
               </button>
             )}
             {timerState.status === "paused" && (
-              <button type="button" onClick={handleResume}>
+              <button type="button" onClick={handleResume} className="timer-btn">
                 Resume
               </button>
             )}
-            <button type="button" onClick={handleStop}>
+            <button type="button" onClick={handleStop} className="timer-btn">
               Stop
             </button>
           </>
