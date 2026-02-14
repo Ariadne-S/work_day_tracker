@@ -69,13 +69,18 @@ fn get_connection() -> Result<Connection> {
 }
 
 fn get_setting(key: &str) -> Result<String> {
-    get_connection()?
-        .query_row("SELECT value FROM settings WHERE key = ?1", params![key], |row| row.get(0))
+    get_connection()?.query_row(
+        "SELECT value FROM settings WHERE key = ?1",
+        params![key],
+        |row| row.get(0),
+    )
 }
 
 fn set_setting(key: &str, value: &str) -> Result<()> {
-    get_connection()?
-        .execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)", params![key, value])?;
+    get_connection()?.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
+        params![key, value],
+    )?;
     Ok(())
 }
 
@@ -152,7 +157,10 @@ pub fn resume_session_impl() -> Result<(), String> {
     let new_start_str = new_start.format("%Y-%m-%d %H:%M:%S").to_string();
     get_connection()
         .map_err(|e| e.to_string())?
-        .execute("UPDATE sessions SET start_time = ?1 WHERE id = ?2", params![new_start_str, session_id])
+        .execute(
+            "UPDATE sessions SET start_time = ?1 WHERE id = ?2",
+            params![new_start_str, session_id],
+        )
         .map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -227,9 +235,7 @@ pub fn quick_log_with_defaults_impl() -> Result<i64, String> {
 /// For sick days, duration_minutes may be 0. Otherwise must be 1–1440.
 pub fn log_full_day_impl(date: &str, location: &str, duration_minutes: i32) -> Result<i64, String> {
     let allow_zero = location == "sick";
-    if duration_minutes < 0
-        || duration_minutes > 24 * 60
-        || (duration_minutes == 0 && !allow_zero)
+    if duration_minutes < 0 || duration_minutes > 24 * 60 || (duration_minutes == 0 && !allow_zero)
     {
         return Err("duration must be 1–1440 minutes (or 0 for sick days)".to_string());
     }
@@ -359,7 +365,11 @@ pub fn get_sessions_impl() -> Result<Vec<SessionRow>, String> {
                 end_time: row.get(3)?,
                 duration_minutes: row.get(4)?,
                 location: row.get(5)?,
-                notes: row.get::<_, Option<String>>(6).ok().flatten().filter(|s| !s.is_empty()),
+                notes: row
+                    .get::<_, Option<String>>(6)
+                    .ok()
+                    .flatten()
+                    .filter(|s| !s.is_empty()),
             })
         })
         .map_err(|e| e.to_string())?;
@@ -453,7 +463,9 @@ pub fn save_setting_impl(key: &str, value: &str) -> Result<(), String> {
         return Err("idle_detection_enabled must be '0' or '1'".to_string());
     }
     if key == "idle_threshold_minutes" {
-        let n: u32 = value.parse().map_err(|_| "idle_threshold_minutes must be 1–60".to_string())?;
+        let n: u32 = value
+            .parse()
+            .map_err(|_| "idle_threshold_minutes must be 1–60".to_string())?;
         if !(1..=60).contains(&n) {
             return Err("idle_threshold_minutes must be 1–60".to_string());
         }

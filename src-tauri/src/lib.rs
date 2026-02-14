@@ -198,7 +198,8 @@ mod tests {
         let dir = tempfile::tempdir().expect("temp dir");
         let db_path = dir.path().join("test.db");
         db::init_at(&db_path).expect("db init failed");
-        let id = log_full_day("2025-02-14".into(), "office".into(), 480).expect("log_full_day failed");
+        let id =
+            log_full_day("2025-02-14".into(), "office".into(), 480).expect("log_full_day failed");
         assert!(id > 0);
         let sessions = db::get_sessions_impl().expect("get_sessions failed");
         assert_eq!(sessions.len(), 1);
@@ -213,7 +214,8 @@ mod tests {
         let dir = tempfile::tempdir().expect("temp dir");
         let db_path = dir.path().join("test.db");
         db::init_at(&db_path).expect("db init failed");
-        let id = log_full_day("2025-02-14".into(), "home".into(), 480).expect("log_full_day failed");
+        let id =
+            log_full_day("2025-02-14".into(), "home".into(), 480).expect("log_full_day failed");
         update_session(id, 450, None).expect("update_session failed");
         let sessions = db::get_sessions_impl().expect("get_sessions failed");
         assert_eq!(sessions.len(), 1);
@@ -237,7 +239,8 @@ mod tests {
         let dir = tempfile::tempdir().expect("temp dir");
         let db_path = dir.path().join("test.db");
         db::init_at(&db_path).expect("db init failed");
-        let id = log_full_day("2025-02-14".into(), "office".into(), 480).expect("log_full_day failed");
+        let id =
+            log_full_day("2025-02-14".into(), "office".into(), 480).expect("log_full_day failed");
         let sessions = db::get_sessions_impl().expect("get_sessions failed");
         assert_eq!(sessions.len(), 1);
         delete_session(id).expect("delete_session failed");
@@ -280,10 +283,21 @@ fn format_elapsed_short(seconds: u64) -> String {
 fn update_tray_tooltip<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     let tooltip = match db::get_timer_state_inner() {
         Ok((status, elapsed)) => match status.as_str() {
-            "running" => format!("Work Day Tracker – Running: {}", format_elapsed_short(elapsed)),
+            "running" => format!(
+                "Work Day Tracker – Running: {}",
+                format_elapsed_short(elapsed)
+            ),
             "paused" => {
-                let suffix = if db::get_paused_due_to_idle() { " (idle)" } else { "" };
-                format!("Work Day Tracker – Paused{}: {}", suffix, format_elapsed_short(elapsed))
+                let suffix = if db::get_paused_due_to_idle() {
+                    " (idle)"
+                } else {
+                    ""
+                };
+                format!(
+                    "Work Day Tracker – Paused{}: {}",
+                    suffix,
+                    format_elapsed_short(elapsed)
+                )
             }
             _ => "Work Day Tracker".to_string(),
         },
@@ -344,78 +358,76 @@ pub fn run() {
                         }
                     }
                 })
-                .on_menu_event(move |app, event| {
-                    match event.id.as_ref() {
-                        "show" => {
-                            if let Some(w) = app.get_webview_window("main") {
-                                let _ = w.show();
-                                let _ = w.set_focus();
-                            }
+                .on_menu_event(move |app, event| match event.id.as_ref() {
+                    "show" => {
+                        if let Some(w) = app.get_webview_window("main") {
+                            let _ = w.show();
+                            let _ = w.set_focus();
                         }
-                        "settings" => {
-                            if let Some(w) = app.get_webview_window("main") {
-                                let _ = w.show();
-                                let _ = w.set_focus();
-                                let _ = app.emit("navigate-to", "settings");
-                            }
-                        }
-                        "quick_log_home" => {
-                            let _ = db::quick_log_with_location_impl("home");
-                            let _ = app.emit("timer-state-changed", ());
-                            update_tray_tooltip(app);
-                        }
-                        "quick_log_office" => {
-                            let _ = db::quick_log_with_location_impl("office");
-                            let _ = app.emit("timer-state-changed", ());
-                            update_tray_tooltip(app);
-                        }
-                        "quick_log_sick" => {
-                            let _ = db::quick_log_with_location_impl("sick");
-                            let _ = app.emit("timer-state-changed", ());
-                            update_tray_tooltip(app);
-                        }
-                        "quit" => {
-                            if let Ok((status, _)) = db::get_timer_state_inner() {
-                                if status == "running" || status == "paused" {
-                                    if let Some(w) = app.get_webview_window("main") {
-                                        let _ = w.show();
-                                        let _ = w.set_focus();
-                                    }
-                                    let _ = app.emit("confirm-quit", ());
-                                    return;
-                                }
-                            }
-                            app.exit(0);
-                        }
-                        "start_home" => {
-                            let _ = db::start_session_impl("home");
-                            let _ = app.emit("timer-state-changed", ());
-                            update_tray_tooltip(app);
-                        }
-                        "start_office" => {
-                            let _ = db::start_session_impl("office");
-                            let _ = app.emit("timer-state-changed", ());
-                            update_tray_tooltip(app);
-                        }
-                        "pause" => {
-                            let _ = db::pause_session_impl();
-                            let _ = app.emit("timer-state-changed", ());
-                            update_tray_tooltip(app);
-                        }
-                        "resume" => {
-                            let _ = db::resume_session_impl();
-                            let _ = app.emit("timer-state-changed", ());
-                            update_tray_tooltip(app);
-                        }
-                        "stop" => {
-                            if let Ok((_, elapsed)) = db::get_timer_state_inner() {
-                                let _ = db::stop_session_impl(elapsed);
-                            }
-                            let _ = app.emit("timer-state-changed", ());
-                            update_tray_tooltip(app);
-                        }
-                        _ => {}
                     }
+                    "settings" => {
+                        if let Some(w) = app.get_webview_window("main") {
+                            let _ = w.show();
+                            let _ = w.set_focus();
+                            let _ = app.emit("navigate-to", "settings");
+                        }
+                    }
+                    "quick_log_home" => {
+                        let _ = db::quick_log_with_location_impl("home");
+                        let _ = app.emit("timer-state-changed", ());
+                        update_tray_tooltip(app);
+                    }
+                    "quick_log_office" => {
+                        let _ = db::quick_log_with_location_impl("office");
+                        let _ = app.emit("timer-state-changed", ());
+                        update_tray_tooltip(app);
+                    }
+                    "quick_log_sick" => {
+                        let _ = db::quick_log_with_location_impl("sick");
+                        let _ = app.emit("timer-state-changed", ());
+                        update_tray_tooltip(app);
+                    }
+                    "quit" => {
+                        if let Ok((status, _)) = db::get_timer_state_inner() {
+                            if status == "running" || status == "paused" {
+                                if let Some(w) = app.get_webview_window("main") {
+                                    let _ = w.show();
+                                    let _ = w.set_focus();
+                                }
+                                let _ = app.emit("confirm-quit", ());
+                                return;
+                            }
+                        }
+                        app.exit(0);
+                    }
+                    "start_home" => {
+                        let _ = db::start_session_impl("home");
+                        let _ = app.emit("timer-state-changed", ());
+                        update_tray_tooltip(app);
+                    }
+                    "start_office" => {
+                        let _ = db::start_session_impl("office");
+                        let _ = app.emit("timer-state-changed", ());
+                        update_tray_tooltip(app);
+                    }
+                    "pause" => {
+                        let _ = db::pause_session_impl();
+                        let _ = app.emit("timer-state-changed", ());
+                        update_tray_tooltip(app);
+                    }
+                    "resume" => {
+                        let _ = db::resume_session_impl();
+                        let _ = app.emit("timer-state-changed", ());
+                        update_tray_tooltip(app);
+                    }
+                    "stop" => {
+                        if let Ok((_, elapsed)) = db::get_timer_state_inner() {
+                            let _ = db::stop_session_impl(elapsed);
+                        }
+                        let _ = app.emit("timer-state-changed", ());
+                        update_tray_tooltip(app);
+                    }
+                    _ => {}
                 })
                 .build(app)
                 .expect("failed to build tray");
@@ -435,7 +447,9 @@ pub fn run() {
                 if !enabled {
                     continue;
                 }
-                let Ok(idle_duration) = system_idle_time::get_idle_time() else { continue };
+                let Ok(idle_duration) = system_idle_time::get_idle_time() else {
+                    continue;
+                };
                 let idle_secs = idle_duration.as_secs();
 
                 if let Ok((status, _)) = db::get_timer_state_inner() {
@@ -455,11 +469,29 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            ping, get_timer_state, start_session, stop_session, pause_session, resume_session,
-            get_sessions, get_settings, save_setting, get_weekly_summary, get_overtime_status,
-            set_leave_early_target, get_leave_early_target, get_export_csv_by_fy,
-            get_export_csv_for_fy, get_financial_years_with_data, seed_sample_data, log_full_day,
-            quick_log_with_defaults, update_session, delete_session, backup_database, quit_app
+            ping,
+            get_timer_state,
+            start_session,
+            stop_session,
+            pause_session,
+            resume_session,
+            get_sessions,
+            get_settings,
+            save_setting,
+            get_weekly_summary,
+            get_overtime_status,
+            set_leave_early_target,
+            get_leave_early_target,
+            get_export_csv_by_fy,
+            get_export_csv_for_fy,
+            get_financial_years_with_data,
+            seed_sample_data,
+            log_full_day,
+            quick_log_with_defaults,
+            update_session,
+            delete_session,
+            backup_database,
+            quit_app
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
