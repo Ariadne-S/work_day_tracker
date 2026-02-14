@@ -95,6 +95,7 @@ function App() {
   const [logDayLocation, setLogDayLocation] = useState("home");
   const [logDayHours, setLogDayHours] = useState(8);
   const [logDayStatus, setLogDayStatus] = useState("");
+  const [editingSession, setEditingSession] = useState(null);
 
   useEffect(() => {
     refreshState(setTimerState);
@@ -217,6 +218,48 @@ function App() {
     } catch (e) {
       setExportStatus(`Error: ${e}`);
       setTimeout(() => setExportStatus(""), 3000);
+    }
+  }
+
+  function openEditModal(s) {
+    const mins = s.duration_minutes ?? 0;
+    setEditingSession({
+      id: s.id,
+      duration_minutes: mins,
+      editHours: Math.floor(mins / 60),
+      editMinutes: mins % 60,
+    });
+  }
+
+  async function handleUpdateDuration(e) {
+    e.preventDefault();
+    if (!editingSession) return;
+    try {
+      const mins = editingSession.editHours * 60 + editingSession.editMinutes;
+      if (mins < 1 || mins > 24 * 60) {
+        return;
+      }
+      await invoke("update_session_duration", {
+        sessionId: editingSession.id,
+        newDurationMinutes: mins,
+      });
+      refreshAppData(setSessions, setWeeklySummary, setFinancialYears);
+      setEditingSession(null);
+    } catch (err) {
+      // Could show error in modal
+      setEditingSession((prev) => prev ? { ...prev, error: String(err) } : null);
+    }
+  }
+
+  async function handleDeleteSession(s) {
+    if (!window.confirm(`Delete session for ${formatDate(s.date)}, ${s.location}, ${formatDuration(s.duration_minutes)}?`)) {
+      return;
+    }
+    try {
+      await invoke("delete_session", { sessionId: s.id });
+      refreshAppData(setSessions, setWeeklySummary, setFinancialYears);
+    } catch (err) {
+      alert(`Error: ${err}`);
     }
   }
 
@@ -448,6 +491,24 @@ function App() {
                     <span className="session-date">{formatDate(s.date)}</span>
                     <span className="session-location">{s.location}</span>
                     <span className="session-duration">{formatDuration(s.duration_minutes)}</span>
+                    <button
+                      type="button"
+                      className="session-edit-btn"
+                      onClick={() => openEditModal(s)}
+                      title="Edit duration"
+                      aria-label="Edit duration"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      type="button"
+                      className="session-delete-btn"
+                      onClick={() => handleDeleteSession(s)}
+                      title="Delete session"
+                      aria-label="Delete session"
+                    >
+                      🗑️
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -463,6 +524,71 @@ function App() {
             </>
           );
         })()}
+      {editingSession && (
+        <div
+          className="edit-modal-overlay"
+          onClick={() => setEditingSession(null)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === "Escape" && setEditingSession(null)}
+          aria-label="Close modal"
+        >
+          <div
+            className="edit-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Edit duration</h3>
+            <p className="edit-modal-original">
+              Original: {formatDuration(editingSession.duration_minutes)}
+            </p>
+            <form onSubmit={handleUpdateDuration} className="edit-modal-form">
+              <div className="edit-modal-row">
+                <label>
+                  Hours
+                  <input
+                    type="number"
+                    min="0"
+                    max="24"
+                    value={editingSession.editHours}
+                    onChange={(e) =>
+                      setEditingSession((prev) => ({
+                        ...prev,
+                        editHours: Math.max(0, Math.min(24, parseInt(e.target.value, 10) || 0)),
+                      }))
+                    }
+                    className="edit-modal-input"
+                  />
+                </label>
+                <label>
+                  Minutes
+                  <input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={editingSession.editMinutes}
+                    onChange={(e) =>
+                      setEditingSession((prev) => ({
+                        ...prev,
+                        editMinutes: Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0)),
+                      }))
+                    }
+                    className="edit-modal-input"
+                  />
+                </label>
+              </div>
+              {editingSession.error && (
+                <p className="edit-modal-error">{editingSession.error}</p>
+              )}
+              <div className="edit-modal-actions">
+                <button type="button" onClick={() => setEditingSession(null)}>
+                  Cancel
+                </button>
+                <button type="submit">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       </section>
         </>
       )}

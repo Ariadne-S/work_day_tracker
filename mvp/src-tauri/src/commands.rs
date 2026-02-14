@@ -53,6 +53,18 @@ pub fn log_full_day(date: String, location: String, duration_minutes: i32) -> Re
     db::log_full_day_impl(&date, &location, duration_minutes)
 }
 
+/// Update duration of a completed session.
+#[tauri::command]
+pub fn update_session_duration(session_id: i64, new_duration_minutes: i32) -> Result<(), String> {
+    db::update_session_duration_impl(session_id, new_duration_minutes)
+}
+
+/// Delete a completed session.
+#[tauri::command]
+pub fn delete_session(session_id: i64) -> Result<(), String> {
+    db::delete_session_impl(session_id)
+}
+
 #[tauri::command]
 pub fn get_settings() -> Result<db::Settings, String> {
     db::get_settings_impl()

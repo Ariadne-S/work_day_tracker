@@ -279,7 +279,7 @@
 
 .session-item {
   display: grid;
-  grid-template-columns: 1fr 5rem 5.5rem;
+  grid-template-columns: 1fr 5rem 5.5rem auto auto;
   gap: 1em;
   padding: 0.5em 0.75em;
   border-radius: 6px;
@@ -302,6 +302,97 @@
   font-family: "SF Mono", Monaco, monospace;
   font-size: 0.9em;
   text-align: right;
+}
+
+.session-edit-btn {
+  padding: 0.25em 0.4em;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 1rem;
+  opacity: 0.6;
+  min-width: auto;
+  box-shadow: none;
+}
+
+.session-edit-btn:hover,
+.session-delete-btn:hover {
+  opacity: 1;
+}
+
+.session-delete-btn {
+  padding: 0.25em 0.4em;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 1rem;
+  opacity: 0.6;
+  min-width: auto;
+  box-shadow: none;
+}
+
+.edit-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.edit-modal {
+  background: var(--background-color, #f6f6f6);
+  padding: 1.5em;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  min-width: 280px;
+}
+
+.edit-modal h3 {
+  margin: 0 0 0.5em 0;
+  font-size: 1.1rem;
+}
+
+.edit-modal-original {
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 1em;
+}
+
+.edit-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+}
+
+.edit-modal-row {
+  display: flex;
+  gap: 1em;
+}
+
+.edit-modal-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25em;
+  font-weight: 500;
+}
+
+.edit-modal-input {
+  width: 4em;
+  padding: 0.4em 0.6em;
+}
+
+.edit-modal-error {
+  color: #c62828;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.edit-modal-actions {
+  display: flex;
+  gap: 0.5em;
+  justify-content: flex-end;
 }
 
 .fy-section {
@@ -553,6 +644,18 @@ button.timer-btn {
 
   .settings-input {
     background-color: #1a1a1a;
+  }
+
+  .edit-modal {
+    background: #2f2f2f;
+  }
+
+  .edit-modal-original {
+    color: #888;
+  }
+
+  .edit-modal-error {
+    color: #f44336;
   }
 
   a:hover {

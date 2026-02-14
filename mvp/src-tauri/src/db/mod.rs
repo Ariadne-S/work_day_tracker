@@ -131,6 +131,39 @@ pub fn resume_session_impl() -> Result<(), String> {
     Ok(())
 }
 
+/// Delete a completed session.
+pub fn delete_session_impl(session_id: i64) -> Result<(), String> {
+    let conn = get_connection().map_err(|e| e.to_string())?;
+    let rows = conn
+        .execute(
+            "DELETE FROM sessions WHERE id = ?1 AND end_time IS NOT NULL",
+            params![session_id],
+        )
+        .map_err(|e| e.to_string())?;
+    if rows == 0 {
+        return Err("session not found or not completed".to_string());
+    }
+    Ok(())
+}
+
+/// Update the duration of a completed session.
+pub fn update_session_duration_impl(session_id: i64, new_duration_minutes: i32) -> Result<(), String> {
+    if new_duration_minutes <= 0 || new_duration_minutes > 24 * 60 {
+        return Err("duration must be between 1 and 1440 minutes".to_string());
+    }
+    let conn = get_connection().map_err(|e| e.to_string())?;
+    let rows = conn
+        .execute(
+            "UPDATE sessions SET duration_minutes = ?1 WHERE id = ?2 AND end_time IS NOT NULL",
+            params![new_duration_minutes, session_id],
+        )
+        .map_err(|e| e.to_string())?;
+    if rows == 0 {
+        return Err("session not found or not completed".to_string());
+    }
+    Ok(())
+}
+
 /// Log a full work day without using the timer. Inserts a completed session.
 pub fn log_full_day_impl(date: &str, location: &str, duration_minutes: i32) -> Result<i64, String> {
     if duration_minutes <= 0 || duration_minutes > 24 * 60 {

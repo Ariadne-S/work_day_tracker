@@ -8,7 +8,7 @@ pub fn run_seed(path: &std::path::Path, force: bool) -> Result<u32, String> {
     db::seed_sample_data_impl(force)
 }
 
-use commands::{get_export_csv_by_fy, get_export_csv_for_fy, get_financial_years_with_data, get_sessions, get_settings, get_timer_state, get_weekly_summary, log_full_day, pause_session, ping, resume_session, save_setting, seed_sample_data, start_session, stop_session};
+use commands::{delete_session, get_export_csv_by_fy, get_export_csv_for_fy, get_financial_years_with_data, get_sessions, get_settings, get_timer_state, get_weekly_summary, log_full_day, pause_session, ping, resume_session, save_setting, seed_sample_data, start_session, stop_session, update_session_duration};
 use tauri::{Emitter, Manager};
 
 #[cfg(test)]
@@ -203,6 +203,33 @@ mod tests {
 
     #[test]
     #[serial]
+    fn test_update_session_duration() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let db_path = dir.path().join("test.db");
+        db::init_at(&db_path).expect("db init failed");
+        let id = log_full_day("2025-02-14".into(), "home".into(), 480).expect("log_full_day failed");
+        update_session_duration(id, 450).expect("update_session_duration failed");
+        let sessions = db::get_sessions_impl().expect("get_sessions failed");
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].duration_minutes, Some(450));
+    }
+
+    #[test]
+    #[serial]
+    fn test_delete_session() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let db_path = dir.path().join("test.db");
+        db::init_at(&db_path).expect("db init failed");
+        let id = log_full_day("2025-02-14".into(), "office".into(), 480).expect("log_full_day failed");
+        let sessions = db::get_sessions_impl().expect("get_sessions failed");
+        assert_eq!(sessions.len(), 1);
+        delete_session(id).expect("delete_session failed");
+        let sessions = db::get_sessions_impl().expect("get_sessions failed");
+        assert_eq!(sessions.len(), 0);
+    }
+
+    #[test]
+    #[serial]
     fn test_get_export_csv_by_fy_australian_financial_year() {
         let dir = tempfile::tempdir().expect("temp dir");
         let db_path = dir.path().join("test.db");
@@ -339,7 +366,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![ping, get_timer_state, start_session, stop_session, pause_session, resume_session, get_sessions, get_settings, save_setting, get_weekly_summary, get_export_csv_by_fy, get_export_csv_for_fy, get_financial_years_with_data, seed_sample_data, log_full_day])
+        .invoke_handler(tauri::generate_handler![ping, get_timer_state, start_session, stop_session, pause_session, resume_session, get_sessions, get_settings, save_setting, get_weekly_summary, get_export_csv_by_fy, get_export_csv_for_fy, get_financial_years_with_data, seed_sample_data, log_full_day, update_session_duration, delete_session])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 window.hide().unwrap();
