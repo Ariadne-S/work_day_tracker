@@ -1,5 +1,9 @@
 :root {
-  font-family: "DM Sans", system-ui, -apple-system, sans-serif;
+  font-family:
+    "DM Sans",
+    system-ui,
+    -apple-system,
+    sans-serif;
   font-size: 16px;
   line-height: 1.5;
   font-weight: 400;
@@ -49,7 +53,10 @@
   font-weight: 500;
   color: var(--muted);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .nav-link:hover {
@@ -349,7 +356,9 @@ h1 {
   font-weight: 500;
   color: var(--muted);
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
 }
 
 .show-more-btn:hover {
@@ -442,7 +451,9 @@ h1 {
 
 .session-edit-btn,
 .session-delete-btn {
-  transition: opacity 0.15s, transform 0.15s;
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
 }
 
 .session-delete-btn {
@@ -585,6 +596,7 @@ h1 {
 }
 
 .fy-section {
+}
 
 .export-view h2,
 .export-view h3 {
@@ -649,7 +661,9 @@ h1 {
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .export-fy-btn:hover {
@@ -792,7 +806,10 @@ button.timer-btn {
   background: var(--accent);
   color: white;
   box-shadow: 0 2px 4px rgba(14, 165, 183, 0.3);
-  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+  transition:
+    background 0.15s,
+    transform 0.1s,
+    box-shadow 0.15s;
 }
 
 button.timer-btn:hover {

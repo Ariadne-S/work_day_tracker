@@ -41,8 +41,12 @@ function refreshSessions(setSessions) {
 
 function refreshAppData(setSessions, setWeeklySummary, setFinancialYears) {
   refreshSessions(setSessions);
-  invoke("get_weekly_summary").then((s) => setWeeklySummary(s)).catch(() => setWeeklySummary(null));
-  invoke("get_financial_years_with_data").then((fys) => setFinancialYears(fys)).catch(() => setFinancialYears([]));
+  invoke("get_weekly_summary")
+    .then((s) => setWeeklySummary(s))
+    .catch(() => setWeeklySummary(null));
+  invoke("get_financial_years_with_data")
+    .then((fys) => setFinancialYears(fys))
+    .catch(() => setFinancialYears([]));
 }
 
 async function saveCsvToFolder(csv, filename, title = "Choose folder to save") {
@@ -78,10 +82,19 @@ function filterSessions(sessions, filter) {
 }
 
 function App() {
-  const [timerState, setTimerState] = useState({ status: "", elapsed_seconds: 0 });
+  const [timerState, setTimerState] = useState(
+    /** @type {{ status: string; elapsed_seconds: number; paused_reason?: string }} */
+    ({ status: "", elapsed_seconds: 0 })
+  );
   const [location, setLocation] = useState("home");
   const [sessions, setSessions] = useState([]);
-  const [settings, setSettings] = useState({ expected_hours_per_week: 40, default_location: "home", enable_overtime_alerts: true, idle_detection_enabled: false, idle_threshold_minutes: 5 });
+  const [settings, setSettings] = useState({
+    expected_hours_per_week: 40,
+    default_location: "home",
+    enable_overtime_alerts: true,
+    idle_detection_enabled: false,
+    idle_threshold_minutes: 5,
+  });
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [weeklySummary, setWeeklySummary] = useState(null);
   const [exportStatus, setExportStatus] = useState("");
@@ -119,7 +132,7 @@ function App() {
         setSettings(s);
         setLocation(s.default_location || "home");
       })
-      .catch(() => { });
+      .catch(() => {});
     invoke("get_financial_years_with_data")
       .then((fys) => setFinancialYears(fys))
       .catch(() => setFinancialYears([]));
@@ -202,7 +215,9 @@ function App() {
       await invoke("stop_session", { elapsedSeconds: timerState.elapsed_seconds });
       refreshState(setTimerState);
       refreshSessions(setSessions);
-      invoke("get_weekly_summary").then((s) => setWeeklySummary(s)).catch(() => { });
+      invoke("get_weekly_summary")
+        .then((s) => setWeeklySummary(s))
+        .catch(() => {});
     } catch (e) {
       setTimerState({ status: `Error: ${e}`, elapsed_seconds: timerState.elapsed_seconds });
     }
@@ -307,12 +322,14 @@ function App() {
       setEditingSession(null);
     } catch (err) {
       // Could show error in modal
-      setEditingSession((prev) => prev ? { ...prev, error: String(err) } : null);
+      setEditingSession((prev) => (prev ? { ...prev, error: String(err) } : null));
     }
   }
 
   async function handleDeleteSession(s) {
-    if (!window.confirm(`Delete session for ${formatDate(s.date)}, ${s.location}, ${formatDuration(s.duration_minutes)}?`)) {
+    if (
+      !window.confirm(`Delete session for ${formatDate(s.date)}, ${s.location}, ${formatDuration(s.duration_minutes)}?`)
+    ) {
       return;
     }
     try {
@@ -368,7 +385,9 @@ function App() {
         value: String(settings.idle_threshold_minutes ?? 5),
       });
       setLocation(settings.default_location);
-      invoke("get_weekly_summary").then((s) => setWeeklySummary(s)).catch(() => { });
+      invoke("get_weekly_summary")
+        .then((s) => setWeeklySummary(s))
+        .catch(() => {});
       setSettingsSaved(true);
       setTimeout(() => setSettingsSaved(false), 2000);
     } catch (e) {
@@ -406,463 +425,448 @@ function App() {
 
       {view === "tracker" && (
         <>
-      <div className="timer-display">
-        <span className="timer-time" data-testid="timer-display">
-          {formatElapsed(timerState.elapsed_seconds)}
-        </span>
-        <span className="timer-status" data-testid="timer-status">
-          {timerState.status === "paused" && timerState.paused_reason === "idle"
-            ? "paused (idle)"
-            : (timerState.status || "—")}
-        </span>
-      </div>
-
-      <div className="location-row">
-        <span className="location-label">Location:</span>
-        <select
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          disabled={timerState.status === "running" || timerState.status === "paused"}
-          className="location-picker"
-        >
-          <option value="home">Home</option>
-          <option value="office">Office</option>
-        </select>
-      </div>
-
-      <div className="row timer-controls">
-        {timerState.status !== "running" && timerState.status !== "paused" && (
-          <button type="button" onClick={handleStart} className="timer-btn">
-            Start
-          </button>
-        )}
-        {(timerState.status === "running" || timerState.status === "paused") && (
-          <>
-            {timerState.status === "running" && (
-              <button type="button" onClick={handlePause} className="timer-btn">
-                Pause
-              </button>
-            )}
-            {timerState.status === "paused" && (
-              <button type="button" onClick={handleResume} className="timer-btn">
-                Resume
-              </button>
-            )}
-            <button type="button" onClick={handleStop} className="timer-btn">
-              Stop
-            </button>
-          </>
-        )}
-      </div>
-
-      {weeklySummary && (
-        <section className="section summary-section summary-compact">
-          <button
-            type="button"
-            className="summary-toggle"
-            onClick={() => setSummaryExpanded(!summaryExpanded)}
-            aria-expanded={summaryExpanded}
-          >
-            <span className="summary-inline">
-              This week: {formatDuration(weeklySummary.actual_minutes)} / {formatDuration(weeklySummary.expected_minutes)}
-              <span
-                className={
-                  "summary-diff-inline " +
-                  (weeklySummary.difference_minutes >= 0 ? "summary-over" : "summary-under")
-                }
-              >
-                {" "}({weeklySummary.difference_minutes >= 0 ? "+" : ""}{formatDuration(Math.abs(weeklySummary.difference_minutes))})
-              </span>
+          <div className="timer-display">
+            <span className="timer-time" data-testid="timer-display">
+              {formatElapsed(timerState.elapsed_seconds)}
             </span>
-            <span className="collapse-icon">{summaryExpanded ? "▴" : "▾"}</span>
-          </button>
-          {summaryExpanded && (
-            <div className="summary-grid">
-              <span className="summary-label">Today</span>
-              <span className="summary-value">{format(new Date(), "EEE dd MMM yyyy")}</span>
-              <span className="summary-label">Week of</span>
-              <span className="summary-value">{formatDate(weeklySummary.week_start)}</span>
-              <span className="summary-label">Actual</span>
-              <span className="summary-value">{formatDuration(weeklySummary.actual_minutes)}</span>
-              <span className="summary-label">Expected</span>
-              <span className="summary-value">{formatDuration(weeklySummary.expected_minutes)}</span>
-              <span className="summary-label">Difference</span>
-              <span
-                className={
-                  "summary-value summary-diff " +
-                  (weeklySummary.difference_minutes >= 0 ? "summary-over" : "summary-under")
-                }
-              >
-                {weeklySummary.difference_minutes >= 0 ? "+" : ""}
-                {formatDuration(Math.abs(weeklySummary.difference_minutes))}
-              </span>
-            </div>
-          )}
-        </section>
-      )}
-
-      <section className="section log-day-section collapsible-section">
-        <button
-          type="button"
-          className="section-toggle"
-          onClick={() => setQuickLogOpen(!quickLogOpen)}
-          aria-expanded={quickLogOpen}
-        >
-          <h2>Quick log</h2>
-          <span className="collapse-icon">{quickLogOpen ? "▴" : "▾"}</span>
-        </button>
-        {quickLogOpen && (
-          <>
-            <p className="log-day-hint">Log a full work day without using the timer</p>
-            <form onSubmit={handleLogDay} className="log-day-form">
-              <div className="log-day-row">
-                <label>
-                  Date
-                  <input
-                    type="date"
-                    value={logDayDate}
-                    onChange={(e) => setLogDayDate(e.target.value)}
-                    className="log-day-input"
-                  />
-                </label>
-                <label>
-                  Location
-                  <select
-                    value={logDayLocation}
-                    onChange={(e) => setLogDayLocation(e.target.value)}
-                    className="location-picker"
-                  >
-                    <option value="home">Home</option>
-                    <option value="office">Office</option>
-                  </select>
-                </label>
-                <label>
-                  Hours
-                  <input
-                    type="number"
-                    min="0.25"
-                    max="24"
-                    step="0.25"
-                    value={logDayHours}
-                    onChange={(e) => setLogDayHours(parseFloat(e.target.value) || 8)}
-                    className="log-day-hours"
-                  />
-                </label>
-              </div>
-              <button type="submit" className="log-day-btn">
-                Log day
-              </button>
-            </form>
-          </>
-        )}
-      </section>
-
-      <section className="section sessions-section collapsible-section">
-        <button
-          type="button"
-          className="section-toggle"
-          onClick={() => setSessionsOpen(!sessionsOpen)}
-          aria-expanded={sessionsOpen}
-        >
-          <h2>Sessions {sessions.length > 0 && <span className="section-count">({sessions.length})</span>}</h2>
-          <span className="collapse-icon">{sessionsOpen ? "▴" : "▾"}</span>
-        </button>
-        {sessionsOpen && (
-        <>
-        <div className="sessions-header">
-          <select
-            value={sessionFilter}
-            onChange={(e) => {
-              setSessionFilter(e.target.value);
-              setSessionsDisplayLimit(SESSION_DISPLAY_INCREMENT);
-            }}
-            className="session-filter"
-          >
-            <option value="all">All</option>
-            <option value="today">Today</option>
-            <option value="week">This week</option>
-            <option value="month">This month</option>
-          </select>
-        </div>
-        <p className="sessions-hint">
-          {sessionFilter === "all"
-            ? "All completed sessions, newest first"
-            : `Filtered to ${sessionFilter === "today" ? "today" : sessionFilter === "week" ? "this week" : "this month"}`}
-        </p>
-        {sessions.length === 0 ? (
-          <p className="sessions-empty">No sessions yet.</p>
-        ) : (() => {
-          const filtered = filterSessions(sessions, sessionFilter);
-          if (filtered.length === 0) {
-            return <p className="sessions-empty">No sessions in this period.</p>;
-          }
-          const displayed = filtered.slice(0, sessionsDisplayLimit);
-          const hasMore = displayed.length < filtered.length;
-          return (
-            <>
-              <ul className="sessions-list">
-                {displayed.map((s) => (
-                  <li key={s.id} className="session-item">
-                    <span className="session-date">{formatDate(s.date)}</span>
-                    <span className="session-location">{s.location}</span>
-                    <span className="session-duration">{formatDuration(s.duration_minutes)}</span>
-                    <button
-                      type="button"
-                      className="session-edit-btn"
-                      onClick={() => openEditModal(s)}
-                      title="Edit duration"
-                      aria-label="Edit duration"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      type="button"
-                      className="session-delete-btn"
-                      onClick={() => handleDeleteSession(s)}
-                      title="Delete session"
-                      aria-label="Delete session"
-                    >
-                      🗑️
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              {hasMore && (
-                <button
-                  type="button"
-                  className="show-more-btn"
-                  onClick={() => setSessionsDisplayLimit((n) => n + SESSION_DISPLAY_INCREMENT)}
-                >
-                  Show more ({filtered.length - displayed.length} remaining)
-                </button>
-              )}
-            </>
-          );
-        })()}
-        </>
-        )}
-      </section>
-      {overtimeModal && (
-        <div
-          className="edit-modal-overlay"
-          onClick={() => setOvertimeModal(null)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === "Escape" && setOvertimeModal(null)}
-          aria-label="Close modal"
-        >
-          <div className="edit-modal overtime-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Overtime this week</h3>
-            <p className="overtime-modal-text">
-              You&apos;ve already hit your weekly target. You can leave {formatDuration(overtimeModal.surplus_minutes)} early if you&apos;d like.
-            </p>
-            <div className="edit-modal-actions">
-              <button type="button" onClick={() => doStartSession(false)}>
-                No, work normally
-              </button>
-              <button type="button" onClick={() => doStartSession(true)} className="overtime-yes-btn">
-                Yes, leave early
-              </button>
-            </div>
+            <span className="timer-status" data-testid="timer-status">
+              {timerState.status === "paused" && timerState.paused_reason === "idle"
+                ? "paused (idle)"
+                : timerState.status || "—"}
+            </span>
           </div>
-        </div>
-      )}
-      {editingSession && (
-        <div
-          className="edit-modal-overlay"
-          onClick={() => setEditingSession(null)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === "Escape" && setEditingSession(null)}
-          aria-label="Close modal"
-        >
-          <div
-            className="edit-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3>Edit duration</h3>
-            <p className="edit-modal-original">
-              Original: {formatDuration(editingSession.duration_minutes)}
-            </p>
-            <form onSubmit={handleUpdateDuration} className="edit-modal-form">
-              <div className="edit-modal-row">
-                <label>
-                  Hours
-                  <input
-                    type="number"
-                    min="0"
-                    max="24"
-                    value={editingSession.editHours}
-                    onChange={(e) =>
-                      setEditingSession((prev) => ({
-                        ...prev,
-                        editHours: Math.max(0, Math.min(24, parseInt(e.target.value, 10) || 0)),
-                      }))
-                    }
-                    className="edit-modal-input"
-                  />
-                </label>
-                <label>
-                  Minutes
-                  <input
-                    type="number"
-                    min="0"
-                    max="59"
-                    value={editingSession.editMinutes}
-                    onChange={(e) =>
-                      setEditingSession((prev) => ({
-                        ...prev,
-                        editMinutes: Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0)),
-                      }))
-                    }
-                    className="edit-modal-input"
-                  />
-                </label>
-              </div>
-              {editingSession.error && (
-                <p className="edit-modal-error">{editingSession.error}</p>
-              )}
-              <div className="edit-modal-actions">
-                <button type="button" onClick={() => setEditingSession(null)}>
-                  Cancel
-                </button>
-                <button type="submit">Save</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-        </>
-      )}
 
-      {view === "export" && (
-        <section className="section export-view">
-        <h2>Export</h2>
-        <div className="export-actions">
-          <button type="button" onClick={handleExport} className="export-btn">
-            {exportStatus || "Export all FYs to folder"}
-          </button>
-        </div>
-        <h3 className="export-subhead">By financial year</h3>
-        {financialYears.length === 0 ? (
-          <p className="fy-empty">
-            No financial year data yet.{" "}
-            <button type="button" onClick={handleLoadSampleData} className="link-btn">
-              Load sample data
-            </button>
-            {" "}to see previous years.
-            {sampleDataStatus && <span className="fy-status"> {sampleDataStatus}</span>}
-          </p>
-        ) : (
-          <>
-            <ul className="fy-list">
-              {financialYears.map((fy) => (
-                <li key={fy} className="fy-item">
-                  <span className="fy-label">
-                    FY {fy}
-                    {fy === getCurrentFY() && " (current)"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleExportFy(fy)}
-                    className="export-fy-btn"
-                  >
-                    {fyExportStatus[fy] || "Export"}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-        </section>
-      )}
-
-      {view === "settings" && (
-      <section className="section settings-section">
-        <h2>Settings</h2>
-        <form onSubmit={handleSaveSettings} className="settings-form">
-          <div className="settings-field">
-            <label htmlFor="expected-hours">Expected hours per week</label>
-            <input
-              id="expected-hours"
-              type="number"
-              min="1"
-              max="168"
-              value={settings.expected_hours_per_week}
-              onChange={(e) => {
-                const v = parseInt(e.target.value, 10);
-                const h = isNaN(v) ? 40 : Math.max(1, Math.min(168, v));
-                setSettings((s) => ({ ...s, expected_hours_per_week: h }));
-              }}
-              className="settings-input"
-            />
-          </div>
-          <div className="settings-field">
-            <label htmlFor="default-location">Default location</label>
+          <div className="location-row">
+            <span className="location-label">Location:</span>
             <select
-              id="default-location"
-              value={settings.default_location}
-              onChange={(e) =>
-                setSettings((s) => ({ ...s, default_location: e.target.value }))
-              }
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              disabled={timerState.status === "running" || timerState.status === "paused"}
               className="location-picker"
             >
               <option value="home">Home</option>
               <option value="office">Office</option>
             </select>
           </div>
-          <label className="settings-checkbox-label">
-            <input
-              type="checkbox"
-              checked={settings.enable_overtime_alerts ?? true}
-              onChange={(e) =>
-                setSettings((s) => ({ ...s, enable_overtime_alerts: e.target.checked }))
-              }
-            />
-            Overtime alerts (Friday: &quot;leave early&quot; when over target)
-          </label>
-          <label className="settings-checkbox-label">
-            <input
-              type="checkbox"
-              checked={settings.idle_detection_enabled ?? false}
-              onChange={(e) =>
-                setSettings((s) => ({ ...s, idle_detection_enabled: e.target.checked }))
-              }
-            />
-            Auto-pause when idle
-          </label>
-          {settings.idle_detection_enabled && (
+
+          <div className="row timer-controls">
+            {timerState.status !== "running" && timerState.status !== "paused" && (
+              <button type="button" onClick={handleStart} className="timer-btn">
+                Start
+              </button>
+            )}
+            {(timerState.status === "running" || timerState.status === "paused") && (
+              <>
+                {timerState.status === "running" && (
+                  <button type="button" onClick={handlePause} className="timer-btn">
+                    Pause
+                  </button>
+                )}
+                {timerState.status === "paused" && (
+                  <button type="button" onClick={handleResume} className="timer-btn">
+                    Resume
+                  </button>
+                )}
+                <button type="button" onClick={handleStop} className="timer-btn">
+                  Stop
+                </button>
+              </>
+            )}
+          </div>
+
+          {weeklySummary && (
+            <section className="section summary-section summary-compact">
+              <button
+                type="button"
+                className="summary-toggle"
+                onClick={() => setSummaryExpanded(!summaryExpanded)}
+                aria-expanded={summaryExpanded}
+              >
+                <span className="summary-inline">
+                  This week: {formatDuration(weeklySummary.actual_minutes)} /{" "}
+                  {formatDuration(weeklySummary.expected_minutes)}
+                  <span
+                    className={
+                      "summary-diff-inline " +
+                      (weeklySummary.difference_minutes >= 0 ? "summary-over" : "summary-under")
+                    }
+                  >
+                    {" "}
+                    ({weeklySummary.difference_minutes >= 0 ? "+" : ""}
+                    {formatDuration(Math.abs(weeklySummary.difference_minutes))})
+                  </span>
+                </span>
+                <span className="collapse-icon">{summaryExpanded ? "▴" : "▾"}</span>
+              </button>
+              {summaryExpanded && (
+                <div className="summary-grid">
+                  <span className="summary-label">Today</span>
+                  <span className="summary-value">{format(new Date(), "EEE dd MMM yyyy")}</span>
+                  <span className="summary-label">Week of</span>
+                  <span className="summary-value">{formatDate(weeklySummary.week_start)}</span>
+                  <span className="summary-label">Actual</span>
+                  <span className="summary-value">{formatDuration(weeklySummary.actual_minutes)}</span>
+                  <span className="summary-label">Expected</span>
+                  <span className="summary-value">{formatDuration(weeklySummary.expected_minutes)}</span>
+                  <span className="summary-label">Difference</span>
+                  <span
+                    className={
+                      "summary-value summary-diff " +
+                      (weeklySummary.difference_minutes >= 0 ? "summary-over" : "summary-under")
+                    }
+                  >
+                    {weeklySummary.difference_minutes >= 0 ? "+" : ""}
+                    {formatDuration(Math.abs(weeklySummary.difference_minutes))}
+                  </span>
+                </div>
+              )}
+            </section>
+          )}
+
+          <section className="section log-day-section collapsible-section">
+            <button
+              type="button"
+              className="section-toggle"
+              onClick={() => setQuickLogOpen(!quickLogOpen)}
+              aria-expanded={quickLogOpen}
+            >
+              <h2>Quick log</h2>
+              <span className="collapse-icon">{quickLogOpen ? "▴" : "▾"}</span>
+            </button>
+            {quickLogOpen && (
+              <>
+                <p className="log-day-hint">Log a full work day without using the timer</p>
+                <form onSubmit={handleLogDay} className="log-day-form">
+                  <div className="log-day-row">
+                    <label>
+                      Date
+                      <input
+                        type="date"
+                        value={logDayDate}
+                        onChange={(e) => setLogDayDate(e.target.value)}
+                        className="log-day-input"
+                      />
+                    </label>
+                    <label>
+                      Location
+                      <select
+                        value={logDayLocation}
+                        onChange={(e) => setLogDayLocation(e.target.value)}
+                        className="location-picker"
+                      >
+                        <option value="home">Home</option>
+                        <option value="office">Office</option>
+                      </select>
+                    </label>
+                    <label>
+                      Hours
+                      <input
+                        type="number"
+                        min="0.25"
+                        max="24"
+                        step="0.25"
+                        value={logDayHours}
+                        onChange={(e) => setLogDayHours(parseFloat(e.target.value) || 8)}
+                        className="log-day-hours"
+                      />
+                    </label>
+                  </div>
+                  <button type="submit" className="log-day-btn">
+                    Log day
+                  </button>
+                </form>
+              </>
+            )}
+          </section>
+
+          <section className="section sessions-section collapsible-section">
+            <button
+              type="button"
+              className="section-toggle"
+              onClick={() => setSessionsOpen(!sessionsOpen)}
+              aria-expanded={sessionsOpen}
+            >
+              <h2>Sessions {sessions.length > 0 && <span className="section-count">({sessions.length})</span>}</h2>
+              <span className="collapse-icon">{sessionsOpen ? "▴" : "▾"}</span>
+            </button>
+            {sessionsOpen && (
+              <>
+                <div className="sessions-header">
+                  <select
+                    value={sessionFilter}
+                    onChange={(e) => {
+                      setSessionFilter(e.target.value);
+                      setSessionsDisplayLimit(SESSION_DISPLAY_INCREMENT);
+                    }}
+                    className="session-filter"
+                  >
+                    <option value="all">All</option>
+                    <option value="today">Today</option>
+                    <option value="week">This week</option>
+                    <option value="month">This month</option>
+                  </select>
+                </div>
+                <p className="sessions-hint">
+                  {sessionFilter === "all"
+                    ? "All completed sessions, newest first"
+                    : `Filtered to ${sessionFilter === "today" ? "today" : sessionFilter === "week" ? "this week" : "this month"}`}
+                </p>
+                {sessions.length === 0 ? (
+                  <p className="sessions-empty">No sessions yet.</p>
+                ) : (
+                  (() => {
+                    const filtered = filterSessions(sessions, sessionFilter);
+                    if (filtered.length === 0) {
+                      return <p className="sessions-empty">No sessions in this period.</p>;
+                    }
+                    const displayed = filtered.slice(0, sessionsDisplayLimit);
+                    const hasMore = displayed.length < filtered.length;
+                    return (
+                      <>
+                        <ul className="sessions-list">
+                          {displayed.map((s) => (
+                            <li key={s.id} className="session-item">
+                              <span className="session-date">{formatDate(s.date)}</span>
+                              <span className="session-location">{s.location}</span>
+                              <span className="session-duration">{formatDuration(s.duration_minutes)}</span>
+                              <button
+                                type="button"
+                                className="session-edit-btn"
+                                onClick={() => openEditModal(s)}
+                                title="Edit duration"
+                                aria-label="Edit duration"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                type="button"
+                                className="session-delete-btn"
+                                onClick={() => handleDeleteSession(s)}
+                                title="Delete session"
+                                aria-label="Delete session"
+                              >
+                                🗑️
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                        {hasMore && (
+                          <button
+                            type="button"
+                            className="show-more-btn"
+                            onClick={() => setSessionsDisplayLimit((n) => n + SESSION_DISPLAY_INCREMENT)}
+                          >
+                            Show more ({filtered.length - displayed.length} remaining)
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()
+                )}
+              </>
+            )}
+          </section>
+          {overtimeModal && (
+            <div
+              className="edit-modal-overlay"
+              onClick={() => setOvertimeModal(null)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === "Escape" && setOvertimeModal(null)}
+              aria-label="Close modal"
+            >
+              <div className="edit-modal overtime-modal" onClick={(e) => e.stopPropagation()}>
+                <h3>Overtime this week</h3>
+                <p className="overtime-modal-text">
+                  You&apos;ve already hit your weekly target. You can leave{" "}
+                  {formatDuration(overtimeModal.surplus_minutes)} early if you&apos;d like.
+                </p>
+                <div className="edit-modal-actions">
+                  <button type="button" onClick={() => doStartSession(false)}>
+                    No, work normally
+                  </button>
+                  <button type="button" onClick={() => doStartSession(true)} className="overtime-yes-btn">
+                    Yes, leave early
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {editingSession && (
+            <div
+              className="edit-modal-overlay"
+              onClick={() => setEditingSession(null)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === "Escape" && setEditingSession(null)}
+              aria-label="Close modal"
+            >
+              <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
+                <h3>Edit duration</h3>
+                <p className="edit-modal-original">Original: {formatDuration(editingSession.duration_minutes)}</p>
+                <form onSubmit={handleUpdateDuration} className="edit-modal-form">
+                  <div className="edit-modal-row">
+                    <label>
+                      Hours
+                      <input
+                        type="number"
+                        min="0"
+                        max="24"
+                        value={editingSession.editHours}
+                        onChange={(e) =>
+                          setEditingSession((prev) => ({
+                            ...prev,
+                            editHours: Math.max(0, Math.min(24, parseInt(e.target.value, 10) || 0)),
+                          }))
+                        }
+                        className="edit-modal-input"
+                      />
+                    </label>
+                    <label>
+                      Minutes
+                      <input
+                        type="number"
+                        min="0"
+                        max="59"
+                        value={editingSession.editMinutes}
+                        onChange={(e) =>
+                          setEditingSession((prev) => ({
+                            ...prev,
+                            editMinutes: Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0)),
+                          }))
+                        }
+                        className="edit-modal-input"
+                      />
+                    </label>
+                  </div>
+                  {editingSession.error && <p className="edit-modal-error">{editingSession.error}</p>}
+                  <div className="edit-modal-actions">
+                    <button type="button" onClick={() => setEditingSession(null)}>
+                      Cancel
+                    </button>
+                    <button type="submit">Save</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {view === "export" && (
+        <section className="section export-view">
+          <h2>Export</h2>
+          <div className="export-actions">
+            <button type="button" onClick={handleExport} className="export-btn">
+              {exportStatus || "Export all FYs to folder"}
+            </button>
+          </div>
+          <h3 className="export-subhead">By financial year</h3>
+          {financialYears.length === 0 ? (
+            <p className="fy-empty">
+              No financial year data yet.{" "}
+              <button type="button" onClick={handleLoadSampleData} className="link-btn">
+                Load sample data
+              </button>{" "}
+              to see previous years.
+              {sampleDataStatus && <span className="fy-status"> {sampleDataStatus}</span>}
+            </p>
+          ) : (
+            <>
+              <ul className="fy-list">
+                {financialYears.map((fy) => (
+                  <li key={fy} className="fy-item">
+                    <span className="fy-label">
+                      FY {fy}
+                      {fy === getCurrentFY() && " (current)"}
+                    </span>
+                    <button type="button" onClick={() => handleExportFy(fy)} className="export-fy-btn">
+                      {fyExportStatus[fy] || "Export"}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+      )}
+
+      {view === "settings" && (
+        <section className="section settings-section">
+          <h2>Settings</h2>
+          <form onSubmit={handleSaveSettings} className="settings-form">
             <div className="settings-field">
-              <label htmlFor="idle-threshold">Idle threshold (minutes)</label>
+              <label htmlFor="expected-hours">Expected hours per week</label>
               <input
-                id="idle-threshold"
+                id="expected-hours"
                 type="number"
                 min="1"
-                max="60"
-                value={settings.idle_threshold_minutes ?? 5}
+                max="168"
+                value={settings.expected_hours_per_week}
                 onChange={(e) => {
                   const v = parseInt(e.target.value, 10);
-                  const m = isNaN(v) ? 5 : Math.max(1, Math.min(60, v));
-                  setSettings((s) => ({ ...s, idle_threshold_minutes: m }));
+                  const h = isNaN(v) ? 40 : Math.max(1, Math.min(168, v));
+                  setSettings((s) => ({ ...s, expected_hours_per_week: h }));
                 }}
                 className="settings-input"
               />
-              <span className="settings-hint">Session auto-pauses after this many minutes of inactivity</span>
             </div>
-          )}
-          <button type="submit" className="settings-save">
-            {settingsSaved ? "Saved" : "Save"}
-          </button>
-        </form>
-      </section>
+            <div className="settings-field">
+              <label htmlFor="default-location">Default location</label>
+              <select
+                id="default-location"
+                value={settings.default_location}
+                onChange={(e) => setSettings((s) => ({ ...s, default_location: e.target.value }))}
+                className="location-picker"
+              >
+                <option value="home">Home</option>
+                <option value="office">Office</option>
+              </select>
+            </div>
+            <label className="settings-checkbox-label">
+              <input
+                type="checkbox"
+                checked={settings.enable_overtime_alerts ?? true}
+                onChange={(e) => setSettings((s) => ({ ...s, enable_overtime_alerts: e.target.checked }))}
+              />
+              Overtime alerts (Friday: &quot;leave early&quot; when over target)
+            </label>
+            <label className="settings-checkbox-label">
+              <input
+                type="checkbox"
+                checked={settings.idle_detection_enabled ?? false}
+                onChange={(e) => setSettings((s) => ({ ...s, idle_detection_enabled: e.target.checked }))}
+              />
+              Auto-pause when idle
+            </label>
+            {settings.idle_detection_enabled && (
+              <div className="settings-field">
+                <label htmlFor="idle-threshold">Idle threshold (minutes)</label>
+                <input
+                  id="idle-threshold"
+                  type="number"
+                  min="1"
+                  max="60"
+                  value={settings.idle_threshold_minutes ?? 5}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    const m = isNaN(v) ? 5 : Math.max(1, Math.min(60, v));
+                    setSettings((s) => ({ ...s, idle_threshold_minutes: m }));
+                  }}
+                  className="settings-input"
+                />
+                <span className="settings-hint">Session auto-pauses after this many minutes of inactivity</span>
+              </div>
+            )}
+            <button type="submit" className="settings-save">
+              {settingsSaved ? "Saved" : "Save"}
+            </button>
+          </form>
+        </section>
       )}
 
       {toast && (
-        <div
-          className={"toast toast-" + toast.type}
-          role="status"
-          aria-live="polite"
-        >
+        <div className={"toast toast-" + toast.type} role="status" aria-live="polite">
           {toast.message}
         </div>
       )}
