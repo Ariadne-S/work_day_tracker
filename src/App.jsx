@@ -91,6 +91,7 @@ function App() {
   const [settings, setSettings] = useState({
     expected_hours_per_week: 40,
     default_location: "home",
+    default_view: "tracker",
     enable_overtime_alerts: true,
     idle_detection_enabled: false,
     idle_threshold_minutes: 5,
@@ -135,8 +136,10 @@ function App() {
     invoke("get_settings")
       .then((s) => {
         const theme = s.theme || "light";
+        const defaultView = s.default_view === "quicklog" ? "quicklog" : "tracker";
         setSettings({ ...s, theme });
         setLocation(s.default_location || "home");
+        setView(defaultView);
         applyTheme(theme);
       })
       .catch(() => {});
@@ -378,6 +381,10 @@ function App() {
       await invoke("save_setting", {
         key: "default_location",
         value: settings.default_location,
+      });
+      await invoke("save_setting", {
+        key: "default_view",
+        value: settings.default_view,
       });
       await invoke("save_setting", {
         key: "enable_overtime_alerts",
@@ -865,6 +872,30 @@ function App() {
                 <option value="home">Home</option>
                 <option value="office">Office</option>
               </select>
+            </div>
+            <div className="settings-field">
+              <label>Default tab on open</label>
+              <div className="theme-options">
+                <label className="theme-option">
+                  <input
+                    type="radio"
+                    name="default_view"
+                    checked={settings.default_view === "tracker"}
+                    onChange={() => setSettings((s) => ({ ...s, default_view: "tracker" }))}
+                  />
+                  Timer
+                </label>
+                <label className="theme-option">
+                  <input
+                    type="radio"
+                    name="default_view"
+                    checked={settings.default_view === "quicklog"}
+                    onChange={() => setSettings((s) => ({ ...s, default_view: "quicklog" }))}
+                  />
+                  Quick log
+                </label>
+              </div>
+              <span className="settings-hint">The tab shown when the app opens</span>
             </div>
             <div className="settings-field">
               <label>Theme</label>

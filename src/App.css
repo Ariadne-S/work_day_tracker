@@ -31,7 +31,8 @@
   padding: 2rem 1.5rem 2.5rem;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
+  align-items: center;
   text-align: center;
   min-height: 100vh;
 }
@@ -917,12 +918,22 @@ button.timer-btn:active {
   --accent: #22d3d8;
   --accent-hover: #2dd4d8;
   --accent-muted: rgba(34, 211, 216, 0.15);
-  --border: #334155;
-  --muted: #94a3b8;
+  --border: #475569;
+  --muted: #cbd5e1;
   --surface: #1e293b;
   --surface-elevated: #334155;
-  color: #f8fafc;
+  color: #f1f5f9;
   background-color: #0f172a;
+}
+
+[data-theme="dark"] h1,
+[data-theme="dark"] .timer-time {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] h2,
+[data-theme="dark"] h3 {
+  color: #e2e8f0;
 }
 
 [data-theme="dark"] .nav-link {
@@ -941,13 +952,19 @@ button.timer-btn:active {
 
 [data-theme="dark"] .subtitle,
 [data-theme="dark"] .timer-status {
-  color: #aaa;
+  color: #cbd5e1;
 }
 
-[data-theme="dark"] .location-picker {
-  border-color: #555;
-  background-color: #1a1a1a;
-  color: #f6f6f6;
+[data-theme="dark"] .location-picker,
+[data-theme="dark"] .log-day-input,
+[data-theme="dark"] .log-day-hours {
+  border-color: #475569;
+  background-color: #1e293b;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .log-day-row label {
+  color: #e2e8f0;
 }
 
 [data-theme="dark"] .sessions-hint,
@@ -956,7 +973,25 @@ button.timer-btn:active {
 [data-theme="dark"] .summary-label,
 [data-theme="dark"] .edit-modal-original,
 [data-theme="dark"] .settings-hint {
-  color: #888;
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .summary-inline,
+[data-theme="dark"] .summary-value,
+[data-theme="dark"] .session-date,
+[data-theme="dark"] .session-location,
+[data-theme="dark"] .session-duration,
+[data-theme="dark"] .fy-label,
+[data-theme="dark"] .fy-empty,
+[data-theme="dark"] .export-view h2,
+[data-theme="dark"] .export-view h3,
+[data-theme="dark"] .edit-modal h3,
+[data-theme="dark"] .edit-modal-row label {
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .settings-checkbox-label {
+  color: #e2e8f0;
 }
 
 [data-theme="dark"] .log-day-btn {
@@ -969,14 +1004,14 @@ button.timer-btn:active {
 }
 
 [data-theme="dark"] .session-filter {
-  border-color: #555;
-  background-color: #1a1a1a;
-  color: #f6f6f6;
+  border-color: #475569;
+  background-color: #1e293b;
+  color: #f1f5f9;
 }
 
 [data-theme="dark"] .show-more-btn {
-  border-color: #666;
-  color: #aaa;
+  border-color: #475569;
+  color: #cbd5e1;
 }
 
 [data-theme="dark"] .show-more-btn:hover {
@@ -998,7 +1033,8 @@ button.timer-btn:active {
 }
 
 [data-theme="dark"] .edit-modal {
-  background: #2f2f2f;
+  background: #334155;
+  color: #e2e8f0;
 }
 
 [data-theme="dark"] .settings-form {
@@ -1007,14 +1043,14 @@ button.timer-btn:active {
 }
 
 [data-theme="dark"] .settings-form .settings-field label {
-  color: #ddd;
+  color: #e2e8f0;
 }
 
 [data-theme="dark"] .settings-form .settings-input,
 [data-theme="dark"] .settings-form .location-picker {
-  background: #1a1a1a;
-  border-color: #555;
-  color: #f6f6f6;
+  background: #1e293b;
+  border-color: #475569;
+  color: #f1f5f9;
 }
 
 [data-theme="dark"] .edit-modal-error {
@@ -1022,7 +1058,7 @@ button.timer-btn:active {
 }
 
 [data-theme="dark"] .overtime-modal-text {
-  color: #ddd;
+  color: #e2e8f0;
 }
 
 [data-theme="dark"] a:hover {
@@ -1033,7 +1069,21 @@ button.timer-btn:active {
   color: #f8fafc;
 }
 
+[data-theme="dark"] .theme-btn {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .theme-btn:hover {
+  color: #22d3d8;
+}
+
 [data-theme="dark"] .theme-btn.active {
   background: var(--accent);
   color: #0f172a;
+}
+
+[data-theme="dark"] .edit-modal-input {
+  background: #1e293b;
+  border-color: #475569;
+  color: #f1f5f9;
 }

@@ -48,6 +48,7 @@ pub fn init_at(path: &Path) -> Result<()> {
         INSERT OR IGNORE INTO settings (key, value) VALUES ('idle_threshold_minutes', '5');
         INSERT OR IGNORE INTO settings (key, value) VALUES ('paused_due_to_idle', '0');
         INSERT OR IGNORE INTO settings (key, value) VALUES ('theme', 'light');
+        INSERT OR IGNORE INTO settings (key, value) VALUES ('default_view', 'tracker');
         ",
     )?;
     let mut guard = DB_PATH.lock().unwrap();
@@ -352,12 +353,21 @@ pub fn get_sessions_impl() -> Result<Vec<SessionRow>, String> {
     sessions.map_err(|e| e.to_string())
 }
 
-const USER_SETTING_KEYS: &[&str] = &["expected_hours_per_week", "default_location", "enable_overtime_alerts", "idle_detection_enabled", "idle_threshold_minutes", "theme"];
+const USER_SETTING_KEYS: &[&str] = &[
+    "expected_hours_per_week",
+    "default_location",
+    "default_view",
+    "enable_overtime_alerts",
+    "idle_detection_enabled",
+    "idle_threshold_minutes",
+    "theme",
+];
 
 #[derive(serde::Serialize)]
 pub struct Settings {
     pub expected_hours_per_week: u32,
     pub default_location: String,
+    pub default_view: String,
     pub enable_overtime_alerts: bool,
     pub idle_detection_enabled: bool,
     pub idle_threshold_minutes: u32,
@@ -375,6 +385,12 @@ pub fn get_settings_impl() -> Result<Settings, String> {
         "office".to_string()
     } else {
         "home".to_string()
+    };
+    let default_view = get_setting("default_view").unwrap_or_else(|_| "tracker".to_string());
+    let default_view = if default_view == "quicklog" {
+        "quicklog".to_string()
+    } else {
+        "tracker".to_string()
     };
     let enable_overtime_alerts = get_setting("enable_overtime_alerts")
         .unwrap_or_else(|_| "1".to_string())
@@ -400,6 +416,7 @@ pub fn get_settings_impl() -> Result<Settings, String> {
     Ok(Settings {
         expected_hours_per_week: expected,
         default_location,
+        default_view,
         enable_overtime_alerts,
         idle_detection_enabled,
         idle_threshold_minutes,
@@ -429,6 +446,9 @@ pub fn save_setting_impl(key: &str, value: &str) -> Result<(), String> {
     }
     if key == "theme" && value != "light" && value != "dark" && value != "system" {
         return Err("theme must be 'light', 'dark', or 'system'".to_string());
+    }
+    if key == "default_view" && value != "tracker" && value != "quicklog" {
+        return Err("default_view must be 'tracker' or 'quicklog'".to_string());
     }
     set_setting(key, value).map_err(|e| e.to_string())
 }
