@@ -228,9 +228,9 @@ pub fn quick_log_with_location_impl(location: &str) -> Result<i64, String> {
             .unwrap_or(40);
         let default_day_hours = expected_hours as f64 / 5.0;
         let d = (default_day_hours * 60.0).round() as i32;
-        d.max(60).min(24 * 60)
+        d.clamp(60, 24 * 60)
     };
-    log_full_day_impl(&date, &location, duration_minutes)
+    log_full_day_impl(&date, location, duration_minutes)
 }
 
 /// Quick log using defaults: today's date, default location, expected_hours/5 as duration.
@@ -243,8 +243,7 @@ pub fn quick_log_with_defaults_impl() -> Result<i64, String> {
 /// For "away" (non-work days), duration_minutes may be 0. Otherwise must be 1–1440.
 pub fn log_full_day_impl(date: &str, location: &str, duration_minutes: i32) -> Result<i64, String> {
     let allow_zero = location == "away";
-    if duration_minutes < 0 || duration_minutes > 24 * 60 || (duration_minutes == 0 && !allow_zero)
-    {
+    if !(0..=24 * 60).contains(&duration_minutes) || (duration_minutes == 0 && !allow_zero) {
         return Err("duration must be 1–1440 minutes (or 0 for away days)".to_string());
     }
     let start_time = format!("{} 09:00:00", date);
