@@ -123,9 +123,7 @@ function App() {
   const [deleteConfirmSession, setDeleteConfirmSession] = useState(null);
   const [quitConfirmModal, setQuitConfirmModal] = useState(false);
   const [overtimeModal, setOvertimeModal] = useState(null);
-  const [newDayModal, setNewDayModal] = useState(
-    /** @type {{ default_view: 'tracker' | 'quicklog' } | null} */ (null)
-  );
+  const [newDayModal, setNewDayModal] = useState(/** @type {{ default_view: 'tracker' | 'quicklog' } | null} */ (null));
   const [leaveEarlyTarget, setLeaveEarlyTarget] = useState(null);
   const [hasShownOvertimeAlert, setHasShownOvertimeAlert] = useState(false);
   const [toast, setToast] = useState(null);
@@ -807,9 +805,7 @@ function App() {
         >
           <div className="edit-modal overtime-modal" onClick={(e) => e.stopPropagation()}>
             <h3>New day</h3>
-            <p className="overtime-modal-text">
-              It&apos;s a new day! What would you like to do?
-            </p>
+            <p className="overtime-modal-text">It&apos;s a new day! What would you like to do?</p>
             <div className="edit-modal-actions">
               {newDayModal.default_view === "quicklog" ? (
                 <>
