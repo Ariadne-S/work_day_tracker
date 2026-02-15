@@ -3,6 +3,7 @@ import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInter
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { disable, enable } from "@tauri-apps/plugin-autostart";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import "./App.css";
 
@@ -103,6 +104,7 @@ function App() {
     enable_overtime_alerts: true,
     idle_detection_enabled: false,
     idle_threshold_minutes: 5,
+    launch_at_login: false,
     theme: "light",
   });
   const [settingsSaved, setSettingsSaved] = useState(false);
@@ -121,6 +123,9 @@ function App() {
   const [deleteConfirmSession, setDeleteConfirmSession] = useState(null);
   const [quitConfirmModal, setQuitConfirmModal] = useState(false);
   const [overtimeModal, setOvertimeModal] = useState(null);
+  const [newDayModal, setNewDayModal] = useState(
+    /** @type {{ default_view: 'tracker' | 'quicklog' } | null} */ (null)
+  );
   const [leaveEarlyTarget, setLeaveEarlyTarget] = useState(null);
   const [hasShownOvertimeAlert, setHasShownOvertimeAlert] = useState(false);
   const [toast, setToast] = useState(null);
@@ -148,6 +153,7 @@ function App() {
         setLocation(s.default_location || "home");
         setView(defaultView);
         applyTheme(theme);
+        (s.launch_at_login ? enable() : disable()).catch(() => {});
       })
       .catch(() => {});
 
@@ -163,10 +169,15 @@ function App() {
     const unlistenQuit = listen("confirm-quit", () => {
       setQuitConfirmModal(true);
     });
+    const unlistenNewDay = listen("new-day-prompt", (e) => {
+      const defaultView = e.payload === "quicklog" ? "quicklog" : "tracker";
+      setNewDayModal({ default_view: defaultView });
+    });
     return () => {
       unlistenTimer.then((fn) => fn());
       unlistenNav.then((fn) => fn());
       unlistenQuit.then((fn) => fn());
+      unlistenNewDay.then((fn) => fn());
     };
   }, []);
 
@@ -432,6 +443,11 @@ function App() {
         key: "idle_threshold_minutes",
         value: String(settings.idle_threshold_minutes ?? 5),
       });
+      await invoke("save_setting", {
+        key: "launch_at_login",
+        value: settings.launch_at_login ? "1" : "0",
+      });
+      (settings.launch_at_login ? enable() : disable()).catch(() => {});
       setLocation(settings.default_location);
       invoke("get_weekly_summary")
         .then((s) => setWeeklySummary(s))
@@ -780,6 +796,76 @@ function App() {
         </div>
       )}
 
+      {newDayModal && (
+        <div
+          className="edit-modal-overlay"
+          onClick={() => setNewDayModal(null)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === "Escape" && setNewDayModal(null)}
+          aria-label="Close modal"
+        >
+          <div className="edit-modal overtime-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>New day</h3>
+            <p className="overtime-modal-text">
+              It&apos;s a new day! What would you like to do?
+            </p>
+            <div className="edit-modal-actions">
+              {newDayModal.default_view === "quicklog" ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewDayModal(null);
+                      setView("quicklog");
+                    }}
+                    className="overtime-yes-btn"
+                  >
+                    Log your day
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewDayModal(null);
+                      setView("tracker");
+                      handleStart();
+                    }}
+                  >
+                    Start the timer
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewDayModal(null);
+                      setView("tracker");
+                      handleStart();
+                    }}
+                    className="overtime-yes-btn"
+                  >
+                    Start the timer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewDayModal(null);
+                      setView("quicklog");
+                    }}
+                  >
+                    Log your day
+                  </button>
+                </>
+              )}
+              <button type="button" onClick={() => setNewDayModal(null)}>
+                Later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {editingSession && (
         <div
           className="edit-modal-overlay"
@@ -1048,6 +1134,14 @@ function App() {
                 onChange={(e) => setSettings((s) => ({ ...s, idle_detection_enabled: e.target.checked }))}
               />
               Auto-pause when idle
+            </label>
+            <label className="settings-checkbox-label">
+              <input
+                type="checkbox"
+                checked={settings.launch_at_login ?? false}
+                onChange={(e) => setSettings((s) => ({ ...s, launch_at_login: e.target.checked }))}
+              />
+              Start at login
             </label>
             {settings.idle_detection_enabled && (
               <div className="settings-field">

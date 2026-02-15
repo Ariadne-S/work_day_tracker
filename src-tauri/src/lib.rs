@@ -314,6 +314,10 @@ fn update_tray_tooltip<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -439,6 +443,21 @@ pub fn run() {
                 std::thread::sleep(std::time::Duration::from_secs(2));
             });
 
+            // New-day prompt: poll every 15 min, show window + modal when calendar day changes
+            let handle_for_new_day = app.handle().clone();
+            std::thread::spawn(move || loop {
+                std::thread::sleep(std::time::Duration::from_secs(15 * 60));
+                if let Ok((should_prompt, default_view)) = db::check_new_day_prompt() {
+                    if should_prompt {
+                        if let Some(w) = handle_for_new_day.get_webview_window("main") {
+                            let _ = w.show();
+                            let _ = w.set_focus();
+                            let _ = handle_for_new_day.emit("new-day-prompt", default_view);
+                        }
+                    }
+                }
+            });
+
             // Idle detection: poll every 30s, pause when idle > threshold, resume when activity returns
             let handle_for_idle = app.handle().clone();
             std::thread::spawn(move || loop {
@@ -496,6 +515,13 @@ pub fn run() {
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 window.hide().unwrap();
+            }
+            if let tauri::WindowEvent::Focused(true) = event {
+                if let Ok((should_prompt, default_view)) = db::check_new_day_prompt() {
+                    if should_prompt {
+                        let _ = window.app_handle().emit("new-day-prompt", default_view);
+                    }
+                }
             }
         })
         .run(tauri::generate_context!())

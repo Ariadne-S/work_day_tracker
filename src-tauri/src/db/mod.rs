@@ -1,4 +1,4 @@
-use chrono::{Datelike, Utc};
+use chrono::{Datelike, NaiveDate, Utc};
 use rusqlite::{params, Connection, Result};
 use std::path::Path;
 use std::sync::Mutex;
@@ -50,6 +50,8 @@ pub fn init_at(path: &Path) -> Result<()> {
         INSERT OR IGNORE INTO settings (key, value) VALUES ('paused_due_to_idle', '0');
         INSERT OR IGNORE INTO settings (key, value) VALUES ('theme', 'light');
         INSERT OR IGNORE INTO settings (key, value) VALUES ('default_view', 'tracker');
+        INSERT OR IGNORE INTO settings (key, value) VALUES ('launch_at_login', '0');
+        INSERT OR IGNORE INTO settings (key, value) VALUES ('last_new_day_prompt_date', '');
         UPDATE sessions SET location = 'away' WHERE location = 'sick';
         ",
     )?;
@@ -392,6 +394,7 @@ const USER_SETTING_KEYS: &[&str] = &[
     "enable_overtime_alerts",
     "idle_detection_enabled",
     "idle_threshold_minutes",
+    "launch_at_login",
     "theme",
 ];
 
@@ -404,6 +407,7 @@ pub struct Settings {
     pub enable_overtime_alerts: bool,
     pub idle_detection_enabled: bool,
     pub idle_threshold_minutes: u32,
+    pub launch_at_login: bool,
     pub theme: String,
 }
 
@@ -440,6 +444,11 @@ pub fn get_settings_impl() -> Result<Settings, String> {
         .parse::<u32>()
         .unwrap_or(5);
     let idle_threshold_minutes = idle_threshold_minutes.clamp(1, 60);
+    let launch_at_login = get_setting("launch_at_login")
+        .unwrap_or_else(|_| "0".to_string())
+        .parse::<u32>()
+        .unwrap_or(0)
+        != 0;
     let theme = get_setting("theme").unwrap_or_else(|_| "light".to_string());
     let theme = if ["light", "dark", "system"].contains(&theme.as_str()) {
         theme
@@ -453,8 +462,38 @@ pub fn get_settings_impl() -> Result<Settings, String> {
         enable_overtime_alerts,
         idle_detection_enabled,
         idle_threshold_minutes,
+        launch_at_login,
         theme,
     })
+}
+
+/// Check if we should show the new-day prompt. When the calendar day has changed since
+/// the last prompt, returns (true, default_view). Updates last_new_day_prompt_date to today.
+/// On first run (no last date) or same day, returns (false, default_view).
+pub fn check_new_day_prompt() -> Result<(bool, String), String> {
+    let today = Utc::now().date_naive();
+    let today_str = today.format("%Y-%m-%d").to_string();
+    let default_view = get_setting("default_view").unwrap_or_else(|_| "tracker".to_string());
+    let default_view = if default_view == "quicklog" {
+        "quicklog".to_string()
+    } else {
+        "tracker".to_string()
+    };
+
+    let last = get_setting("last_new_day_prompt_date").unwrap_or_default();
+    if last.is_empty() {
+        let _ = set_setting("last_new_day_prompt_date", &today_str);
+        return Ok((false, default_view));
+    }
+    let Ok(last_date) = NaiveDate::parse_from_str(&last, "%Y-%m-%d") else {
+        let _ = set_setting("last_new_day_prompt_date", &today_str);
+        return Ok((false, default_view));
+    };
+    if today <= last_date {
+        return Ok((false, default_view));
+    }
+    set_setting("last_new_day_prompt_date", &today_str).map_err(|e| e.to_string())?;
+    Ok((true, default_view))
 }
 
 /// Save a user setting. Only whitelisted keys are allowed.
@@ -484,6 +523,9 @@ pub fn save_setting_impl(key: &str, value: &str) -> Result<(), String> {
     }
     if key == "default_view" && value != "tracker" && value != "quicklog" {
         return Err("default_view must be 'tracker' or 'quicklog'".to_string());
+    }
+    if key == "launch_at_login" && value != "0" && value != "1" {
+        return Err("launch_at_login must be '0' or '1'".to_string());
     }
     set_setting(key, value).map_err(|e| e.to_string())
 }
